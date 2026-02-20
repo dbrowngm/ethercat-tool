@@ -1,0 +1,92 @@
+"""Unit tests for report builder."""
+
+from ethercat_tool.models import LinkIssue, SlaveInfo, TopologySummary
+from ethercat_tool.report import build_markdown
+
+
+def test_build_markdown_empty_chain() -> None:
+    """Report with no slaves and init failed."""
+    summary = TopologySummary(adapter_name="eth0", slave_count=0, init_ok=False)
+    md = build_markdown(summary, [], [LinkIssue(None, "No slaves found")])
+    assert "EtherCAT Topology Report" in md
+    assert "eth0" in md
+    assert "**Slaves found:** 0" in md
+    assert "**Init status:** Failed" in md
+    assert "No slaves in chain" in md
+    assert "Link / init issues" in md
+    assert "No slaves found" in md
+
+
+def test_build_markdown_one_slave_no_issues() -> None:
+    """Report with one slave and no link issues."""
+    summary = TopologySummary(adapter_name="en0", slave_count=1, init_ok=True)
+    slave = SlaveInfo(
+        name="EL1008",
+        manufacturer_id=0x00000002,
+        product_code=0x03F03052,
+        revision=0x00110000,
+        device_name="EL1008",
+        hardware_version="1",
+        firmware_version="01",
+        bootloader_version="00",
+        serial_number="",
+        diagnostics=None,
+    )
+    md = build_markdown(summary, [slave], [])
+    assert "**Slaves found:** 1" in md
+    assert "**Init status:** OK" in md
+    assert "Master → [EL1008]" in md
+    assert "Slave 0: EL1008" in md
+    assert "EL1008" in md
+    assert "00000002" in md or "2" in md
+    assert "Link / init issues" not in md
+
+
+def test_build_markdown_multiple_slaves_with_issues() -> None:
+    """Report with multiple slaves and link issues."""
+    summary = TopologySummary(adapter_name="eth0", slave_count=2, init_ok=True)
+    slaves = [
+        SlaveInfo(
+            name="AX5000",
+            manufacturer_id=0x00000001,
+            product_code=0x0,
+            revision=0,
+            device_name="AX5000",
+            hardware_version="",
+            firmware_version="",
+            bootloader_version="",
+            serial_number="123",
+            diagnostics=None,
+        ),
+        SlaveInfo(
+            name="EL1008",
+            manufacturer_id=0x2,
+            product_code=0x3F03052,
+            revision=0x110000,
+            device_name="EL1008",
+            hardware_version="1",
+            firmware_version="01",
+            bootloader_version="00",
+            serial_number="",
+            diagnostics={"RX errors": "0"},
+        ),
+    ]
+    issues = [LinkIssue(1, "Slave did not reach OP")]
+    md = build_markdown(summary, slaves, issues)
+    assert "**Slaves found:** 2" in md
+    assert "[AX5000] → [EL1008]" in md
+    assert "Slave 0: AX5000" in md
+    assert "Slave 1: EL1008" in md
+    assert "RX errors" in md
+    assert "Link / init issues" in md
+    assert "Slave 1:" in md
+    assert "Slave did not reach OP" in md
+
+
+def test_build_markdown_writes_file(tmp_path: str) -> None:
+    """build_markdown with output_path writes file and returns same string."""
+    summary = TopologySummary(adapter_name="eth0", slave_count=0, init_ok=False)
+    out = tmp_path / "report.md"
+    md = build_markdown(summary, [], [], output_path=str(out))
+    assert out.read_text() == md
+    assert "EtherCAT Topology Report" in md
