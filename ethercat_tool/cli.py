@@ -52,6 +52,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Do not re-run with sudo on permission error.",
     )
+    p.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Include traceback and extra detail when init fails.",
+    )
     return p.parse_args(argv)
 
 
@@ -93,7 +99,7 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
         )
         return 1
 
-    slaves, summary, link_issues = scan(args.adapter)
+    slaves, summary, link_issues = scan(args.adapter, verbose=args.verbose)
 
     # On permission-style init failure, re-run once under sudo unless root or --no-elevate.
     if (

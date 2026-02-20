@@ -64,7 +64,14 @@ def build_markdown(
         lines.append("")
         for issue in link_issues:
             loc = f"Slave {issue.slave_index}" if issue.slave_index is not None else "Master"
-            lines.append(f"- **{loc}:** {issue.message}")
+            if "\n" in issue.message:
+                lines.append(f"- **{loc}:**")
+                lines.append("")
+                lines.append("```")
+                lines.append(issue.message.strip())
+                lines.append("```")
+            else:
+                lines.append(f"- **{loc}:** {issue.message}")
         lines.append("")
 
     md = "\n".join(lines)

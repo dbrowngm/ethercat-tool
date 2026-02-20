@@ -54,6 +54,13 @@ SDO read timeout (default 500 ms):
 ethercat-tool --adapter eth0 --timeout-ms 300
 ```
 
+More detail when init fails (traceback and hints):
+
+```bash
+ethercat-tool --adapter eth0 -v
+# or --verbose
+```
+
 ## Report contents
 
 - **Summary:** adapter name, timestamp, slave count, init status
@@ -72,7 +79,11 @@ If you see an init error (e.g. "could not open interface en7" or "No slaves foun
 3. **USB NICs on macOS:** Some USB Ethernet adapters or drivers do not expose raw sockets to the OS. If `sudo` doesn’t help, the adapter may be unsupported for EtherCAT on macOS; try a different USB NIC or a built-in Ethernet port if available.
 4. **Cabling and slaves:** "No slaves found" can mean the adapter opened but no slaves replied: check cable, power, and that slaves are in PRE-OP (power cycle the chain if needed).
 
-The exact error is always in the report under **Link / init issues** and is also printed to stderr.
+The exact error is always in the report under **Link / init issues** and is also printed to stderr. Use **`-v` / `--verbose`** to include a full traceback and extra hints when init fails.
+
+**“No slaves found” with working counter -1:** The master got **no valid reply** from the segment (frame didn’t come back or was invalid). Usually means: nothing is connected to the adapter’s port, the cable is unplugged or wrong port, slaves have no power, or you’re plugged into a **switch** (EtherCAT is a line—no switches). Fix: connect the NIC directly to the first slave’s upstream port; power the chain; ensure the first slave is in PRE-OP (power-cycle if needed).
+
+**“No slaves found” with working counter 0:** The frame went out and back but **no slaves responded**. Check cabling and that all slaves are powered and in PRE-OP.
 
 ## Limitations
 
