@@ -138,6 +138,44 @@ def test_build_markdown_with_esi_lookup() -> None:
     assert "EL1008 8-channel digital input" in md
 
 
+def test_build_markdown_port_diagnostics_subtable() -> None:
+    """Port status, CRC, and Fwd CRC are grouped in a per-port subtable."""
+    summary = TopologySummary(adapter_name="en7", device_count=1, init_ok=True)
+    device = DeviceInfo(
+        name="EK1100",
+        manufacturer_id=2,
+        product_code=72100946,
+        revision=1179648,
+        device_name="N/A",
+        hardware_version="N/A",
+        firmware_version="N/A",
+        bootloader_version="N/A",
+        serial_number="N/A",
+        diagnostics={
+            "CRC (Port A/B/C/D)": "0 / 0 / 0 / 0",
+            "Fwd CRC (Port A/B/C/D)": "0 / 0 / 255 / 0",
+            "Link loss": "7",
+        },
+        state="PRE-OP (ACK)",
+        al_status_code=0,
+        al_status_text="OK",
+        port_status={
+            "A": "carrier / open",
+            "B": "carrier / open",
+            "C": "no carrier / closed",
+            "D": "no carrier / closed",
+        },
+    )
+    md = build_markdown(summary, [device], [])
+    assert "**Port diagnostics**" in md
+    assert "| Port | Status | CRC | Fwd CRC |" in md
+    assert "| A | carrier / open | 0 | 0 |" in md
+    assert "| C | no carrier / closed | 0 | 255 |" in md
+    assert "| Link loss | 7 |" in md
+    # Link loss in main table, not port table
+    assert md.count("Link loss") == 1
+
+
 def test_build_markdown_includes_adapter_details() -> None:
     """Report includes adapter details when available."""
     adapter_info = AdapterInfo(
