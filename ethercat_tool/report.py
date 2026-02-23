@@ -1,6 +1,6 @@
 """Build markdown report from topology and slave info."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from ethercat_tool.esi_data import EsiLookupResult, lookup_device
 from ethercat_tool.models import LinkIssue, SlaveInfo, TopologySummary
@@ -44,12 +44,18 @@ def build_markdown(
 ) -> str:
     """Build markdown report string; optionally write to file."""
     lines: list[str] = []
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    now = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
     # Title and meta
     lines.append("# EtherCAT Topology Report")
     lines.append("")
     lines.append(f"- **Adapter:** {summary.adapter_name}")
+    if summary.adapter_info:
+        details = summary.adapter_info.as_dict()
+        if details:
+            lines.append("- **Adapter details:**")
+            for k, v in details.items():
+                lines.append(f"  - {k}: {v}")
     lines.append(f"- **Timestamp:** {now}")
     lines.append("")
 

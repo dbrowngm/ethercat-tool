@@ -4,6 +4,7 @@ import traceback
 
 import pysoem
 
+from ethercat_tool.adapter_info import get_adapter_info
 from ethercat_tool.diagnostics import read_diagnostics
 from ethercat_tool.models import LinkIssue, SlaveInfo, TopologySummary
 from ethercat_tool.slave_info import collect_slave_info
@@ -67,10 +68,12 @@ def scan(
                 )
                 slave_infos.append(info)
 
+        adapter_info = get_adapter_info(adapter_name)
         summary = TopologySummary(
             adapter_name=adapter_name,
             slave_count=slave_count,
             init_ok=init_ok,
+            adapter_info=adapter_info,
         )
         return (slave_infos, summary, issues)
     except Exception as e:
@@ -78,10 +81,12 @@ def scan(
         if verbose:
             msg += "\n\nTraceback:\n" + traceback.format_exc()
         issues.append(LinkIssue(None, msg))
+        adapter_info = get_adapter_info(adapter_name)
         summary = TopologySummary(
             adapter_name=adapter_name,
             slave_count=0,
             init_ok=False,
+            adapter_info=adapter_info,
         )
         return ([], summary, issues)
     finally:

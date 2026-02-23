@@ -1,5 +1,6 @@
 """Unit tests for report builder."""
 
+from ethercat_tool.adapter_info import AdapterInfo
 from ethercat_tool.esi_data import EsiLookupResult
 from ethercat_tool.models import LinkIssue, SlaveInfo, TopologySummary
 from ethercat_tool.report import build_markdown
@@ -135,3 +136,28 @@ def test_build_markdown_with_esi_lookup() -> None:
     md = build_markdown(summary, [slave], [], esi_lookup=esi_lookup)
     assert "Beckhoff Automation GmbH & Co. KG" in md
     assert "EL1008 8-channel digital input" in md
+
+
+def test_build_markdown_includes_adapter_details() -> None:
+    """Report includes adapter details when available."""
+    adapter_info = AdapterInfo(
+        name="en7",
+        mac_address="AA:BB:CC:DD:EE:FF",
+        link_state="active",
+        link_speed="1000 Mb/s full-duplex",
+        hardware_port="Thunderbolt Ethernet",
+        mtu="1500",
+    )
+    summary = TopologySummary(
+        adapter_name="en7",
+        slave_count=0,
+        init_ok=False,
+        adapter_info=adapter_info,
+    )
+    md = build_markdown(summary, [], [])
+    assert "**Adapter:** en7" in md
+    assert "Adapter details:" in md
+    assert "MAC Address: AA:BB:CC:DD:EE:FF" in md
+    assert "Link State: active" in md
+    assert "Link Speed: 1000 Mb/s full-duplex" in md
+    assert "Hardware Port: Thunderbolt Ethernet" in md

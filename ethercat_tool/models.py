@@ -1,6 +1,12 @@
 """Data types for topology scan and report."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ethercat_tool.adapter_info import AdapterInfo
 
 # EtherCAT state machine states (EC_STATE_* values from SOEM)
 EC_STATE_NAMES: dict[int, str] = {
@@ -42,6 +48,7 @@ class TopologySummary:
     adapter_name: str
     slave_count: int
     init_ok: bool  # True if config_init found at least one slave and no fatal error
+    adapter_info: AdapterInfo | None = None  # Optional NIC details (MAC, link speed, etc.)
 
 
 @dataclass(frozen=True)
