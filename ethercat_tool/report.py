@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from ethercat_tool.config_parser import ConfigValidationResult
 from ethercat_tool.esi_data import EsiLookupResult, lookup_device
 from ethercat_tool.models import DeviceInfo, LinkIssue, TopologySummary
 
@@ -128,6 +129,7 @@ def build_markdown(
     *,
     output_path: str | None = None,
     esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None = None,
+    config_validation: ConfigValidationResult | None = None,
 ) -> str:
     """Build markdown report string; optionally write to file."""
     lines: list[str] = []
@@ -192,6 +194,31 @@ def build_markdown(
             port_table = _render_port_table(s.port_status, crc_by_port, fwd_crc_by_port)
             lines.extend(port_table)
             lines.append("")
+
+    # Config validation
+    if config_validation is not None:
+        lines.append("## Config validation")
+        lines.append("")
+        if (
+            config_validation.count_expected == config_validation.count_found
+            and not config_validation.mismatches
+        ):
+            lines.append("All devices match config.")
+        else:
+            if config_validation.count_expected != config_validation.count_found:
+                lines.append(
+                    f"- **Device count:** Expected {config_validation.count_expected}, "
+                    f"Found {config_validation.count_found}"
+                )
+                if config_validation.missing:
+                    missing_types = ", ".join(
+                        f"{t} (position {p})" for p, t in config_validation.missing
+                    )
+                    lines.append(f"- **Missing:** {missing_types}")
+                lines.append("")
+            for pos, expected, found in config_validation.mismatches:
+                lines.append(f"- **Position {pos}:** Expected: {expected}, Found: {found}")
+        lines.append("")
 
     # Link / init issues
     if link_issues:

@@ -54,6 +54,16 @@ SDO read timeout (default 500 ms):
 ethercat-tool --adapter eth0 --timeout-ms 300
 ```
 
+Validate scan against a TwinCAT EtherCAT config file (checks Device Name vs ProductRevision):
+
+```bash
+ethercat-tool --adapter eth0 --validate-config config.xml
+```
+
+Mismatches are reported as `Expected: EL1014, Found: EL2904` (for example) and included in the report.
+
+**To obtain the config XML from TwinCAT:** Double-click the EtherCAT master under I/O and Devices, go to the EtherCAT tab, then click **Export Configuration File**.
+
 More detail when init fails (traceback and hints):
 
 ```bash

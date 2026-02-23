@@ -176,6 +176,81 @@ def test_build_markdown_port_diagnostics_subtable() -> None:
     assert md.count("Link loss") == 1
 
 
+def test_build_markdown_config_validation_match() -> None:
+    """Report shows 'All devices match config' when validation passes."""
+    from ethercat_tool.config_parser import ConfigValidationResult
+
+    summary = TopologySummary(adapter_name="eth0", device_count=1, init_ok=True)
+    device = DeviceInfo(
+        name="EL1008",
+        manufacturer_id=2,
+        product_code=0,
+        revision=0,
+        device_name="EL1008",
+        hardware_version="",
+        firmware_version="",
+        bootloader_version="",
+        serial_number="",
+        diagnostics=None,
+        state="PRE-OP",
+        al_status_code=0,
+        al_status_text="OK",
+        port_status=None,
+    )
+    cv = ConfigValidationResult(count_expected=1, count_found=1, mismatches=[], missing=[])
+    md = build_markdown(summary, [device], [], config_validation=cv)
+    assert "## Config validation" in md
+    assert "All devices match config" in md
+
+
+def test_build_markdown_config_validation_count_mismatch() -> None:
+    """Report shows missing device types when count expected > found."""
+    from ethercat_tool.config_parser import ConfigValidationResult
+
+    summary = TopologySummary(adapter_name="eth0", device_count=6, init_ok=True)
+    devices = [
+        DeviceInfo(f"Dev{i}", 2, 0, 0, "N/A", "", "", "", "", None, "PRE-OP", 0, "OK", None)
+        for i in range(6)
+    ]
+    cv = ConfigValidationResult(
+        count_expected=7, count_found=6, mismatches=[], missing=[(6, "EL9011")]
+    )
+    md = build_markdown(summary, devices, [], config_validation=cv)
+    assert "## Config validation" in md
+    assert "Expected 7" in md and "Found 6" in md
+    assert "**Missing:**" in md
+    assert "EL9011 (position 6)" in md
+
+
+def test_build_markdown_config_validation_mismatch() -> None:
+    """Report shows Expected/Found format for mismatches."""
+    from ethercat_tool.config_parser import ConfigValidationResult
+
+    summary = TopologySummary(adapter_name="eth0", device_count=1, init_ok=True)
+    device = DeviceInfo(
+        name="EL2904",
+        manufacturer_id=2,
+        product_code=0,
+        revision=0,
+        device_name="EL2904",
+        hardware_version="",
+        firmware_version="",
+        bootloader_version="",
+        serial_number="",
+        diagnostics=None,
+        state="PRE-OP",
+        al_status_code=0,
+        al_status_text="OK",
+        port_status=None,
+    )
+    cv = ConfigValidationResult(
+        count_expected=1, count_found=1, mismatches=[(0, "EL1014", "EL2904")], missing=[]
+    )
+    md = build_markdown(summary, [device], [], config_validation=cv)
+    assert "## Config validation" in md
+    assert "Expected: EL1014, Found: EL2904" in md
+
+
 def test_build_markdown_includes_adapter_details() -> None:
     """Report includes adapter details when available."""
     adapter_info = AdapterInfo(

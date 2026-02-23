@@ -13,6 +13,7 @@ from ethercat_tool.esi_data import (
     has_esi_data,
     load_esi_lookup,
 )
+from ethercat_tool.config_parser import parse_config, validate_scan
 from ethercat_tool.report import build_markdown
 from ethercat_tool.scanner import scan
 
@@ -71,6 +72,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--no-esi-prompt",
         action="store_true",
         help="Do not prompt to fetch ESI when missing; use raw IDs only.",
+    )
+    p.add_argument(
+        "--validate-config",
+        metavar="PATH",
+        dest="validate_config",
+        help="Validate scan against TwinCAT EtherCAT config XML (checks Device Name vs ProductRevision).",
     )
     return p.parse_args(argv)
 
@@ -178,12 +185,37 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         output_path = f"ethercat-scan-{timestamp}.md"
 
+    config_validation = None
+    if args.validate_config:
+        try:
+            expected_types = parse_config(args.validate_config)
+            config_validation = validate_scan(device_infos, expected_types, esi_lookup)
+            for pos, expected, found in config_validation.mismatches:
+                print(
+                    f"ethercat-tool: Position {pos}: Expected: {expected}, Found: {found}",
+                    file=sys.stderr,
+                )
+            if config_validation.count_expected != config_validation.count_found:
+                print(
+                    f"ethercat-tool: Device count: Expected {config_validation.count_expected}, "
+                    f"Found {config_validation.count_found}",
+                    file=sys.stderr,
+                )
+                for pos, expected in config_validation.missing:
+                    print(
+                        f"ethercat-tool: Missing: {expected} (position {pos})",
+                        file=sys.stderr,
+                    )
+        except ValueError as e:
+            print(f"ethercat-tool: Config validation failed: {e}", file=sys.stderr)
+
     md = build_markdown(
         summary,
         device_infos,
         link_issues,
         output_path=output_path,
         esi_lookup=esi_lookup,
+        config_validation=config_validation,
     )
     if args.print_results:
         print(md)
