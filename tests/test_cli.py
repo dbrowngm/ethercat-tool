@@ -49,6 +49,32 @@ def test_main_adapter_required_without_list() -> None:
     assert "adapter" in err.getvalue().lower() or "required" in err.getvalue().lower()
 
 
+def test_main_fetch_esi_standalone() -> None:
+    """--fetch-esi without --adapter fetches ESI and exits."""
+    with patch("ethercat_tool.cli.has_esi_data", return_value=False):
+        with patch("ethercat_tool.cli.fetch_esi_data", return_value=True):
+            with patch("sys.stderr", new_callable=StringIO) as err:
+                rc = main(["--fetch-esi"])
+    assert rc == 0
+    assert "ESI" in err.getvalue()
+
+
+def test_main_fetch_esi_replaces_existing() -> None:
+    """--fetch-esi always fetches and replaces any existing data."""
+    with patch("ethercat_tool.cli.fetch_esi_data", return_value=True):
+        with patch("sys.stderr", new_callable=StringIO) as err:
+            rc = main(["--fetch-esi"])
+    assert rc == 0
+    assert "downloaded and indexed" in err.getvalue()
+
+
+def test_parse_args_fetch_esi() -> None:
+    """--fetch-esi and --no-esi-prompt are parsed."""
+    args = parse_args(["--fetch-esi", "--no-esi-prompt"])
+    assert args.fetch_esi is True
+    assert args.no_esi_prompt is True
+
+
 def test_main_scan_produces_markdown() -> None:
     """With --adapter and mocked scan, main produces markdown with topology."""
     from ethercat_tool.models import SlaveInfo, TopologySummary
@@ -70,15 +96,16 @@ def test_main_scan_produces_markdown() -> None:
         port_status=None,
     )
 
-    with patch("ethercat_tool.cli.scan") as m_scan:
-        m_scan.return_value = (
-            [slave_info],
-            TopologySummary(adapter_name="eth0", slave_count=1, init_ok=True),
-            [],
-        )
+    with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
+        with patch("ethercat_tool.cli.scan") as m_scan:
+            m_scan.return_value = (
+                [slave_info],
+                TopologySummary(adapter_name="eth0", slave_count=1, init_ok=True),
+                [],
+            )
 
-        with patch("sys.stdout", new_callable=StringIO) as out:
-            rc = main(["--adapter", "eth0", "--no-coe"])
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                rc = main(["--adapter", "eth0", "--no-coe"])
 
     assert rc == 0
     md = out.getvalue()
@@ -91,13 +118,14 @@ def test_main_scan_with_output_file(tmp_path: str) -> None:
     """With --output, report is written to file and not printed to stdout."""
     out_file = tmp_path / "report.md"
 
-    with patch("ethercat_tool.cli.scan") as m_scan:
-        from ethercat_tool.models import TopologySummary
+    with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
+        with patch("ethercat_tool.cli.scan") as m_scan:
+            from ethercat_tool.models import TopologySummary
 
-        m_scan.return_value = ([], TopologySummary("eth0", 0, False), [])
+            m_scan.return_value = ([], TopologySummary("eth0", 0, False), [])
 
-        with patch("sys.stdout", new_callable=StringIO) as out:
-            rc = main(["--adapter", "eth0", "--output", str(out_file)])
+            with patch("sys.stdout", new_callable=StringIO) as out:
+                rc = main(["--adapter", "eth0", "--output", str(out_file)])
 
     assert rc == 0
     content = out_file.read_text()
@@ -110,19 +138,20 @@ def test_main_permission_error_reexecs_with_sudo_unless_no_elevate() -> None:
     """Permission-like init error and not root: we try to re-exec with sudo."""
     from ethercat_tool.models import LinkIssue, TopologySummary
 
-    with patch("ethercat_tool.cli.scan") as m_scan:
-        m_scan.return_value = (
-            [],
-            TopologySummary("en7", 0, False),
-            [LinkIssue(None, "Init failed: could not open interface en7")],
-        )
-        with patch("ethercat_tool.cli.os.geteuid", return_value=500):
-            with patch("ethercat_tool.cli.os.execvp") as m_exec:
-                m_exec.side_effect = OSError(2, "No such file or directory: sudo")
-                with patch("sys.stderr", new_callable=StringIO) as err:
-                    with patch("sys.stdout", new_callable=StringIO):
-                        rc = main(["--adapter", "en7"])
-        m_exec.assert_called_once()
+    with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
+        with patch("ethercat_tool.cli.scan") as m_scan:
+            m_scan.return_value = (
+                [],
+                TopologySummary("en7", 0, False),
+                [LinkIssue(None, "Init failed: could not open interface en7")],
+            )
+            with patch("ethercat_tool.cli.os.geteuid", return_value=500):
+                with patch("ethercat_tool.cli.os.execvp") as m_exec:
+                    m_exec.side_effect = OSError(2, "No such file or directory: sudo")
+                    with patch("sys.stderr", new_callable=StringIO) as err:
+                        with patch("sys.stdout", new_callable=StringIO):
+                            rc = main(["--adapter", "en7"])
+            m_exec.assert_called_once()
         assert "sudo" in str(m_exec.call_args[0][1])
         assert "en7" in str(m_exec.call_args[0][1])
     assert "could not open" in err.getvalue()
@@ -133,16 +162,17 @@ def test_main_permission_error_no_reexec_with_no_elevate() -> None:
     """With --no-elevate we do not re-exec on permission error."""
     from ethercat_tool.models import LinkIssue, TopologySummary
 
-    with patch("ethercat_tool.cli.scan") as m_scan:
-        m_scan.return_value = (
-            [],
-            TopologySummary("en7", 0, False),
-            [LinkIssue(None, "Init failed: could not open interface en7")],
-        )
-        with patch("ethercat_tool.cli.os.geteuid", return_value=500):
-            with patch("ethercat_tool.cli.os.execvp") as m_exec:
-                with patch("sys.stderr", new_callable=StringIO):
-                    with patch("sys.stdout", new_callable=StringIO) as out:
-                        main(["--adapter", "en7", "--no-elevate"])
-        m_exec.assert_not_called()
+    with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
+        with patch("ethercat_tool.cli.scan") as m_scan:
+            m_scan.return_value = (
+                [],
+                TopologySummary("en7", 0, False),
+                [LinkIssue(None, "Init failed: could not open interface en7")],
+            )
+            with patch("ethercat_tool.cli.os.geteuid", return_value=500):
+                with patch("ethercat_tool.cli.os.execvp") as m_exec:
+                    with patch("sys.stderr", new_callable=StringIO):
+                        with patch("sys.stdout", new_callable=StringIO) as out:
+                            main(["--adapter", "en7", "--no-elevate"])
+            m_exec.assert_not_called()
     assert "could not open" in out.getvalue() or "Init failed" in out.getvalue()

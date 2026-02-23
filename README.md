@@ -61,11 +61,27 @@ ethercat-tool --adapter eth0 -v
 # or --verbose
 ```
 
+### ESI device database (decode manufacturer / product names)
+
+The scan report can decode manufacturer ID and product code to human-readable names (e.g. "2 — Beckhoff Automation GmbH", "0x044C2C52 — EL1008") using the EtherCAT device database (ESI data) from [linuxcnc-ethercat/esi-data](https://github.com/linuxcnc-ethercat/esi-data).
+
+**First-time setup:** Download the ESI database (one-time, ~44 MB). Re-running replaces any existing data:
+
+```bash
+ethercat-tool --fetch-esi
+```
+
+**Automatic prompt:** If no ESI data is present and you run a scan interactively, the tool will prompt: "No ESI device data found. Decode manufacturer/product names? [y/N]". Answer `y` to download.
+
+**Without prompt:** Use `--no-esi-prompt` to skip the prompt and always use raw IDs only.
+
+Data is stored in `~/.local/share/ethercat-tool/` (or `%LOCALAPPDATA%\ethercat-tool` on Windows). The device index (cache) is built when you run `--fetch-esi`, not during scan. If the cache is missing at scan time, a warning is printed but the scan continues with raw IDs.
+
 ## Report contents
 
 - **Summary:** adapter name, timestamp, slave count, init status
 - **Topology:** chain order (Master → [Slave0] → [Slave1] → …) and per-slave details:
-  - Manufacturer ID, Product Code, Revision
+  - Manufacturer ID, Product Code, Revision (decoded to names when ESI data is available)
   - Device name, hardware/firmware/bootloader version, serial (from CoE when available)
   - **State** (INIT, PRE-OP, SAFE-OP, OP) and **AL Status** (Application Layer status code)
   - **Port status** (A/B/C/D: carrier/closed vs no carrier/open) when available

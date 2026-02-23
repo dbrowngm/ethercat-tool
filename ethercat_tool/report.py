@@ -2,7 +2,36 @@
 
 from datetime import datetime, timezone
 
+from ethercat_tool.esi_data import EsiLookupResult, lookup_device
 from ethercat_tool.models import LinkIssue, SlaveInfo, TopologySummary
+
+
+def _format_manufacturer(
+    s: SlaveInfo,
+    esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None,
+) -> str:
+    base = f"{s.manufacturer_id} (0x{s.manufacturer_id:08X})"
+    if esi_lookup:
+        res = lookup_device(
+            esi_lookup, s.manufacturer_id, s.product_code, s.revision
+        )
+        if res and res.manufacturer_name:
+            return f"{base} — {res.manufacturer_name}"
+    return base
+
+
+def _format_product_code(
+    s: SlaveInfo,
+    esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None,
+) -> str:
+    base = f"{s.product_code} (0x{s.product_code:08X})"
+    if esi_lookup:
+        res = lookup_device(
+            esi_lookup, s.manufacturer_id, s.product_code, s.revision
+        )
+        if res and res.product_name:
+            return f"{base} — {res.product_name}"
+    return base
 
 
 def build_markdown(
@@ -11,6 +40,7 @@ def build_markdown(
     link_issues: list[LinkIssue],
     *,
     output_path: str | None = None,
+    esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None = None,
 ) -> str:
     """Build markdown report string; optionally write to file."""
     lines: list[str] = []
@@ -45,8 +75,10 @@ def build_markdown(
             lines.append("")
             lines.append("| Field | Value |")
             lines.append("| --- | --- |")
-            lines.append(f"| Manufacturer ID | {s.manufacturer_id} |")
-            lines.append(f"| Product Code | {s.product_code} |")
+            man_display = _format_manufacturer(s, esi_lookup)
+            prod_display = _format_product_code(s, esi_lookup)
+            lines.append(f"| Manufacturer ID | {man_display} |")
+            lines.append(f"| Product Code | {prod_display} |")
             lines.append(f"| Revision | {s.revision} |")
             lines.append(f"| Device Name | {s.device_name} |")
             lines.append(f"| Hardware Version | {s.hardware_version} |")

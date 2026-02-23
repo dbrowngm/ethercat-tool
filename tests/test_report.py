@@ -1,5 +1,6 @@
 """Unit tests for report builder."""
 
+from ethercat_tool.esi_data import EsiLookupResult
 from ethercat_tool.models import LinkIssue, SlaveInfo, TopologySummary
 from ethercat_tool.report import build_markdown
 
@@ -102,3 +103,35 @@ def test_build_markdown_writes_file(tmp_path: str) -> None:
     md = build_markdown(summary, [], [], output_path=str(out))
     assert out.read_text() == md
     assert "EtherCAT Topology Report" in md
+
+
+def test_build_markdown_with_esi_lookup() -> None:
+    """Report decodes manufacturer and product when ESI lookup available."""
+    summary = TopologySummary(adapter_name="eth0", slave_count=1, init_ok=True)
+    slave = SlaveInfo(
+        name="EL1008",
+        manufacturer_id=0x00000002,
+        product_code=0x044C2C52,
+        revision=0x00100000,
+        device_name="EL1008",
+        hardware_version="",
+        firmware_version="",
+        bootloader_version="",
+        serial_number="",
+        diagnostics=None,
+        state="PRE-OP",
+        al_status_code=0,
+        al_status_text="OK",
+        port_status=None,
+    )
+    esi_lookup = {
+        (2, 0x044C2C52, 0x00100000): EsiLookupResult(
+            manufacturer_name="Beckhoff Automation GmbH & Co. KG",
+            product_name="EL1008 8-channel digital input",
+            device_type="EL1008",
+            url=None,
+        ),
+    }
+    md = build_markdown(summary, [slave], [], esi_lookup=esi_lookup)
+    assert "Beckhoff Automation GmbH & Co. KG" in md
+    assert "EL1008 8-channel digital input" in md

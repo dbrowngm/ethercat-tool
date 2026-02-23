@@ -7,6 +7,11 @@ from typing import NoReturn
 
 import pysoem
 
+from ethercat_tool.esi_data import (
+    fetch_esi_data,
+    has_esi_data,
+    load_esi_lookup,
+)
 from ethercat_tool.report import build_markdown
 from ethercat_tool.scanner import scan
 
@@ -56,6 +61,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Include traceback and extra detail when init fails.",
     )
+    p.add_argument(
+        "--fetch-esi",
+        action="store_true",
+        help="Download ESI device database (linuxcnc-ethercat/esi-data).",
+    )
+    p.add_argument(
+        "--no-esi-prompt",
+        action="store_true",
+        help="Do not prompt to fetch ESI when missing; use raw IDs only.",
+    )
     return p.parse_args(argv)
 
 
@@ -89,6 +104,39 @@ def _list_adapters() -> int:
     return 0
 
 
+def _ensure_esi_data(args: argparse.Namespace) -> bool:
+    """Ensure ESI data exists. Fetch if --fetch-esi, prompt if missing. Return True to proceed."""
+    if has_esi_data():
+        return True
+    if args.fetch_esi:
+        print(
+            "Downloading ESI device database (may take 1–2 minutes)...",
+            file=sys.stderr,
+        )
+        if fetch_esi_data():
+            print("ESI data downloaded successfully.", file=sys.stderr)
+            return True
+        print("Warning: Failed to download ESI data. Proceeding with raw IDs.", file=sys.stderr)
+        return True  # proceed anyway
+    if args.no_esi_prompt:
+        return True  # user opted out of prompt
+    if sys.stdin.isatty():
+        try:
+            reply = input(
+                "No ESI device data found. Decode manufacturer/product names? [y/N] "
+            ).strip().lower()
+            if reply in ("y", "yes"):
+                print(
+                    "Downloading ESI device database (may take 1–2 minutes)...",
+                    file=sys.stderr,
+                )
+                if fetch_esi_data():
+                    return True
+        except EOFError:
+            pass
+    return True  # proceed with raw IDs
+
+
 def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
     if not args.adapter:
         print(
@@ -96,6 +144,9 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
             file=sys.stderr,
         )
         return 1
+
+    _ensure_esi_data(args)
+    esi_lookup = load_esi_lookup()
 
     slave_infos, summary, link_issues = scan(
         args.adapter,
@@ -126,10 +177,24 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
         slave_infos,
         link_issues,
         output_path=args.output,
+        esi_lookup=esi_lookup,
     )
     if not args.output:
         print(md)
     return 0
+
+
+def _run_fetch_esi() -> int:
+    """Fetch ESI data and exit. Replaces any existing data."""
+    print(
+        "Downloading ESI device database (may take 1–2 minutes)...",
+        file=sys.stderr,
+    )
+    if fetch_esi_data():
+        print("ESI data downloaded and indexed.", file=sys.stderr)
+        return 0
+    print("Error: Failed to download ESI data.", file=sys.stderr)
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -138,6 +203,8 @@ def main(argv: list[str] | None = None) -> int:
     user_argv = argv if argv is not None else sys.argv[1:]
     if args.list_adapters:
         return _list_adapters()
+    if args.fetch_esi and not args.adapter:
+        return _run_fetch_esi()
     return _run_scan(args, user_argv)
 
 
