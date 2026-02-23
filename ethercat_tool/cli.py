@@ -20,7 +20,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     p = argparse.ArgumentParser(
         prog="ethercat-tool",
-        description="EtherCAT troubleshooting: scan slaves, topology map, link diagnostics.",
+        description="EtherCAT troubleshooting: scan devices, topology map, link diagnostics.",
     )
     p.add_argument(
         "--list-adapters",
@@ -148,7 +148,7 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
     _ensure_esi_data(args)
     esi_lookup = load_esi_lookup()
 
-    slave_infos, summary, link_issues = scan(
+    device_infos, summary, link_issues = scan(
         args.adapter,
         verbose=args.verbose,
         coe=not args.no_coe,
@@ -174,7 +174,7 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
 
     md = build_markdown(
         summary,
-        slave_infos,
+        device_infos,
         link_issues,
         output_path=args.output,
         esi_lookup=esi_lookup,

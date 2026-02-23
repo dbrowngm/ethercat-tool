@@ -1,19 +1,19 @@
-"""Unit tests for slave_info module."""
+"""Unit tests for device_info module."""
 
 from unittest.mock import MagicMock
 
-from ethercat_tool.slave_info import collect_slave_info
+from ethercat_tool.device_info import collect_device_info
 
 
-def test_collect_slave_info_no_coe() -> None:
+def test_collect_device_info_no_coe() -> None:
     """Without CoE we only get SII fields; SDO is not called."""
-    slave = MagicMock()
-    slave.name = "EL1008"
-    slave.man = 0x00000002
-    slave.id = 0x03F03052
-    slave.rev = 0x00110000
+    device = MagicMock()
+    device.name = "EL1008"
+    device.man = 0x00000002
+    device.id = 0x03F03052
+    device.rev = 0x00110000
 
-    info = collect_slave_info(slave, coe=False)
+    info = collect_device_info(device, coe=False)
 
     assert info.name == "EL1008"
     assert info.manufacturer_id == 0x00000002
@@ -23,16 +23,16 @@ def test_collect_slave_info_no_coe() -> None:
     assert info.firmware_version == "N/A"
     assert info.serial_number == "N/A"
     assert info.diagnostics is None
-    slave.sdo_read.assert_not_called()
+    device.sdo_read.assert_not_called()
 
 
-def test_collect_slave_info_with_coe_success() -> None:
+def test_collect_device_info_with_coe_success() -> None:
     """With CoE, SDO reads are used and decoded."""
-    slave = MagicMock()
-    slave.name = "EL1008"
-    slave.man = 2
-    slave.id = 0x03F03052
-    slave.rev = 0x110000
+    device = MagicMock()
+    device.name = "EL1008"
+    device.man = 2
+    device.id = 0x03F03052
+    device.rev = 0x110000
 
     def sdo_read(index: int, subindex: int, size: int = 0) -> bytes:
         if index == 0x1008:
@@ -47,9 +47,9 @@ def test_collect_slave_info_with_coe_success() -> None:
             return (12345).to_bytes(4, "little")
         return b""
 
-    slave.sdo_read = sdo_read
+    device.sdo_read = sdo_read
 
-    info = collect_slave_info(slave, coe=True)
+    info = collect_device_info(device, coe=True)
 
     assert info.device_name == "EL1008"
     assert info.hardware_version == "HW1"
@@ -58,32 +58,32 @@ def test_collect_slave_info_with_coe_success() -> None:
     assert info.serial_number == "12345"
 
 
-def test_collect_slave_info_sdo_raises_returns_na() -> None:
+def test_collect_device_info_sdo_raises_returns_na() -> None:
     """When SDO read raises, we get N/A and no exception."""
-    slave = MagicMock()
-    slave.name = "X"
-    slave.man = 0
-    slave.id = 0
-    slave.rev = 0
-    slave.sdo_read.side_effect = Exception("object not found")
+    device = MagicMock()
+    device.name = "X"
+    device.man = 0
+    device.id = 0
+    device.rev = 0
+    device.sdo_read.side_effect = Exception("object not found")
 
-    info = collect_slave_info(slave, coe=True)
+    info = collect_device_info(device, coe=True)
 
     assert info.device_name == "N/A"
     assert info.firmware_version == "N/A"
     assert info.serial_number == "N/A"
 
 
-def test_collect_slave_info_with_diagnostics_injected() -> None:
-    """Optional diagnostics dict is passed through to SlaveInfo."""
-    slave = MagicMock()
-    slave.name = "S"
-    slave.man = 0
-    slave.id = 0
-    slave.rev = 0
+def test_collect_device_info_with_diagnostics_injected() -> None:
+    """Optional diagnostics dict is passed through to DeviceInfo."""
+    device = MagicMock()
+    device.name = "S"
+    device.man = 0
+    device.id = 0
+    device.rev = 0
 
-    info = collect_slave_info(
-        slave,
+    info = collect_device_info(
+        device,
         coe=False,
         diagnostics={"RX errors": "0", "Link lost": "1"},
     )
@@ -93,16 +93,16 @@ def test_collect_slave_info_with_diagnostics_injected() -> None:
     assert info.diagnostics["Link lost"] == "1"
 
 
-def test_collect_slave_info_missing_attributes_defaults() -> None:
+def test_collect_device_info_missing_attributes_defaults() -> None:
     """Empty SII name becomes N/A; missing attrs default to 0."""
 
-    class MinimalSlave:
+    class MinimalDevice:
         name = ""
         man = 0
         id = 0
         rev = 0
 
-    info = collect_slave_info(MinimalSlave(), coe=False)
+    info = collect_device_info(MinimalDevice(), coe=False)
     assert info.name == "N/A"
     assert info.manufacturer_id == 0
     assert info.product_code == 0

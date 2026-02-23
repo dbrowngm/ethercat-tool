@@ -20,8 +20,8 @@ EC_STATE_NAMES: dict[int, str] = {
 
 
 @dataclass(frozen=True)
-class SlaveInfo:
-    """Per-slave information for the report (SII + optional CoE)."""
+class DeviceInfo:
+    """Per-device information for the report (SII + optional CoE)."""
 
     name: str
     manufacturer_id: int
@@ -46,14 +46,14 @@ class TopologySummary:
     """Summary of the scan (adapter, count, init status)."""
 
     adapter_name: str
-    slave_count: int
-    init_ok: bool  # True if config_init found at least one slave and no fatal error
+    device_count: int
+    init_ok: bool  # True if config_init found at least one device and no fatal error
     adapter_info: AdapterInfo | None = None  # Optional NIC details (MAC, link speed, etc.)
 
 
 @dataclass(frozen=True)
 class LinkIssue:
-    """A link or init issue (optional slave index)."""
+    """A link or init issue (optional device index)."""
 
-    slave_index: int | None  # None = master/global
+    device_index: int | None  # None = master/global
     message: str

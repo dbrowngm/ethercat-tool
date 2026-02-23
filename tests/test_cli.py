@@ -77,9 +77,9 @@ def test_parse_args_fetch_esi() -> None:
 
 def test_main_scan_produces_markdown() -> None:
     """With --adapter and mocked scan, main produces markdown with topology."""
-    from ethercat_tool.models import SlaveInfo, TopologySummary
+    from ethercat_tool.models import DeviceInfo, TopologySummary
 
-    slave_info = SlaveInfo(
+    device_info = DeviceInfo(
         name="EL1008",
         manufacturer_id=2,
         product_code=0,
@@ -99,8 +99,8 @@ def test_main_scan_produces_markdown() -> None:
     with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
         with patch("ethercat_tool.cli.scan") as m_scan:
             m_scan.return_value = (
-                [slave_info],
-                TopologySummary(adapter_name="eth0", slave_count=1, init_ok=True),
+                [device_info],
+                TopologySummary(adapter_name="eth0", device_count=1, init_ok=True),
                 [],
             )
 

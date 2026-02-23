@@ -1,6 +1,6 @@
 """Best-effort read of link/diagnostic CoE objects.
 
-Many EtherCAT slaves do not expose link lost or RX error counters via CoE;
+Many EtherCAT devices do not expose link lost or RX error counters via CoE;
 the main link health signal is init success and working counter.
 When present, device-specific indices may be tried here.
 """
@@ -8,11 +8,11 @@ When present, device-specific indices may be tried here.
 from typing import Any
 
 
-def read_diagnostics(slave: Any, timeout_ms: int = 300) -> dict[str, str] | None:
-    """Read best-effort diagnostic counters from slave via CoE.
+def read_diagnostics(device: Any, timeout_ms: int = 300) -> dict[str, str] | None:
+    """Read best-effort diagnostic counters from device via CoE.
 
     Returns a dict of label -> value when any read succeeds, or None.
-    Many slaves do not support these objects; treat as optional.
+    Many devices do not support these objects; treat as optional.
     """
     _ = timeout_ms  # reserved for per-call timeout when supported
     result: dict[str, str] = {}
@@ -28,7 +28,7 @@ def read_diagnostics(slave: Any, timeout_ms: int = 300) -> dict[str, str] | None
 
     for index, subindex, label in candidates:
         try:
-            raw = slave.sdo_read(index, subindex, size=4)
+            raw = device.sdo_read(index, subindex, size=4)
             if raw and len(raw) >= 4:
                 val = int.from_bytes(bytes(raw)[:4], "little")
                 result[label] = str(val)

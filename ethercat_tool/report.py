@@ -1,13 +1,13 @@
-"""Build markdown report from topology and slave info."""
+"""Build markdown report from topology and device info."""
 
 from datetime import datetime
 
 from ethercat_tool.esi_data import EsiLookupResult, lookup_device
-from ethercat_tool.models import LinkIssue, SlaveInfo, TopologySummary
+from ethercat_tool.models import DeviceInfo, LinkIssue, TopologySummary
 
 
 def _format_manufacturer(
-    s: SlaveInfo,
+    s: DeviceInfo,
     esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None,
 ) -> str:
     base = f"{s.manufacturer_id} (0x{s.manufacturer_id:08X})"
@@ -21,7 +21,7 @@ def _format_manufacturer(
 
 
 def _format_product_code(
-    s: SlaveInfo,
+    s: DeviceInfo,
     esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None,
 ) -> str:
     base = f"{s.product_code} (0x{s.product_code:08X})"
@@ -36,7 +36,7 @@ def _format_product_code(
 
 def build_markdown(
     summary: TopologySummary,
-    slave_infos: list[SlaveInfo],
+    device_infos: list[DeviceInfo],
     link_issues: list[LinkIssue],
     *,
     output_path: str | None = None,
@@ -63,21 +63,21 @@ def build_markdown(
     init_status = "OK" if summary.init_ok else "Failed"
     lines.append("## Summary")
     lines.append("")
-    lines.append(f"- **Slaves found:** {summary.slave_count}")
+    lines.append(f"- **Devices found:** {summary.device_count}")
     lines.append(f"- **Init status:** {init_status}")
     lines.append("")
 
     # Topology
     lines.append("## Topology")
     lines.append("")
-    if not slave_infos:
-        lines.append("No slaves in chain.")
+    if not device_infos:
+        lines.append("No devices in chain.")
     else:
-        chain = " → ".join([f"[{s.name}]" for s in slave_infos])
+        chain = " → ".join([f"[{s.name}]" for s in device_infos])
         lines.append(f"`Master → {chain}`")
         lines.append("")
-        for i, s in enumerate(slave_infos):
-            lines.append(f"### Slave {i}: {s.name}")
+        for i, s in enumerate(device_infos):
+            lines.append(f"### Device {i}: {s.name}")
             lines.append("")
             lines.append("| Field | Value |")
             lines.append("| --- | --- |")
@@ -106,7 +106,7 @@ def build_markdown(
         lines.append("## Link / init issues")
         lines.append("")
         for issue in link_issues:
-            loc = f"Slave {issue.slave_index}" if issue.slave_index is not None else "Master"
+            loc = f"Device {issue.device_index}" if issue.device_index is not None else "Master"
             if "\n" in issue.message:
                 lines.append(f"- **{loc}:**")
                 lines.append("")

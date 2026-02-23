@@ -1,4 +1,4 @@
-"""ESI (EtherCAT Slave Information) data: load, lookup, download.
+"""ESI (EtherCAT device information) data: load, lookup, download.
 
 Decodes manufacturer ID, product code, revision to human-readable names
 using data from linuxcnc-ethercat/esi-data (YAML from ESI XML files).
