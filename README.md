@@ -85,7 +85,8 @@ Data is stored in `~/.local/share/ethercat-tool/` (or `%LOCALAPPDATA%\ethercat-t
   - Device name, hardware/firmware/bootloader version, serial (from CoE when available)
   - **State** (INIT, PRE-OP, SAFE-OP, OP) and **AL Status** (Application Layer status code)
   - **Port status** (A/B/C/D: carrier/closed vs no carrier/open) when available
-  - Optional diagnostic counters (link loss, etc.) when the device exposes them
+  - **Per-port CRC counters** (RXERR and Fwd CRC for ports A/B/C/D) and link-loss count, read from ESC registers—same data TwinCAT shows
+  - Optional CoE diagnostic objects when the device exposes them
 - **Link / init issues:** init failures, “no devices found”, or other errors
 
 ## Troubleshooting init errors (e.g. on USB NIC / en0, en7)
@@ -105,6 +106,6 @@ The exact error is always in the report under **Link / init issues** and is also
 
 ## Limitations
 
-- **Link/CRC diagnostics:** Many EtherCAT devices do not expose link-loss or RX error counters via CoE. The tool reports init success/failure and working counter; optional CoE diagnostic objects are read when present (best-effort).
+- **Link/CRC diagnostics:** Per-port CRC counters (RXERR, Fwd CRC) and link-loss are read from ESC registers via FPRD—available on all standard EtherCAT slaves, same as TwinCAT. Some older or custom ESC implementations may not support this; the tool falls back gracefully. Optional CoE diagnostic objects are also read when present (best-effort).
 - **Port status:** Port A/B/C/D (carrier/closed vs no carrier/open) is read from the device when PySOEM exposes `activeports` or the device supports CoE 0xF030; otherwise it is omitted.
 - **Real-time:** This tool is for troubleshooting only. It does not provide real-time cycle or distributed clock sync.
