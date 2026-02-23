@@ -53,6 +53,11 @@ def build_markdown(
             lines.append(f"| Firmware | {s.firmware_version} |")
             lines.append(f"| Bootloader | {s.bootloader_version} |")
             lines.append(f"| Serial | {s.serial_number} |")
+            lines.append(f"| State | {s.state} |")
+            lines.append(f"| AL Status | {s.al_status_text} (0x{s.al_status_code:04X}) |")
+            if s.port_status:
+                port_str = ", ".join(f"{k}: {v}" for k, v in s.port_status.items())
+                lines.append(f"| Ports | {port_str} |")
             if s.diagnostics:
                 for k, v in s.diagnostics.items():
                     lines.append(f"| {k} | {v} |")

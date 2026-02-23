@@ -1,8 +1,10 @@
-"""Collect slave info from SII and optional CoE (device name, firmware, etc.)."""
+"""Collect slave info from SII, optional CoE, state machine, and port status."""
 
 from typing import Any
 
-from ethercat_tool.models import SlaveInfo
+import pysoem
+
+from ethercat_tool.models import EC_STATE_NAMES, SlaveInfo
 
 # CoE standard object indices (CANopen over EtherCAT)
 COE_DEVICE_NAME = 0x1008
@@ -38,6 +40,41 @@ def _sdo_read_string(
         return _decode_string(bytes(raw))
     except Exception:
         return _NA
+
+
+def _read_port_status(slave: Any) -> dict[str, str] | None:
+    """Best-effort port status (A/B/C/D: carrier|no carrier|open|closed|N/A).
+
+    Tries activeports (if exposed by PySOEM) then CoE 0xF030.
+    """
+    # Try PySOEM/ec_slave activeports (bitmap: bit0=portA, bit1=portB, ...)
+    # Per SOEM: bit set = "port open and communication established" (Carrier / Open)
+    #           bit clear = port closed or no link (No Carrier / Closed)
+    ap = getattr(slave, "activeports", None)
+    if ap is not None and isinstance(ap, int):
+        result = {}
+        for i, label in enumerate(["A", "B", "C", "D"]):
+            if ap & (1 << i):
+                result[label] = "carrier / open"
+            else:
+                result[label] = "no carrier / closed"
+        return result if result else None
+
+    # Fallback: try CoE 0xF030 Physical Layer (some devices)
+    try:
+        raw = slave.sdo_read(0xF030, 1, size=4)
+        if raw and len(raw) >= 4:
+            val = int.from_bytes(bytes(raw)[:4], "little")
+            result = {}
+            for i, label in enumerate(["A", "B", "C", "D"]):
+                if val & (1 << i):
+                    result[label] = "carrier / open"
+                else:
+                    result[label] = "no carrier / closed"
+            return result
+    except Exception:
+        pass
+    return None
 
 
 def _sdo_read_uint32(slave: Any, index: int, subindex: int, timeout_us: int = 500_000) -> str:
@@ -83,6 +120,19 @@ def collect_slave_info(
             # Some devices use a string for serial
             serial_number = _sdo_read_string(slave, COE_IDENTITY, 4, timeout_us)
 
+    # State machine (always available from slave after master.read_state)
+    # Base state is in lower bits; bit 0x10 = EC_STATE_ACK (acknowledgment)
+    state_raw = int(getattr(slave, "state", 0))
+    base_state = state_raw & 0x0F
+    state_str = EC_STATE_NAMES.get(base_state, f"0x{state_raw:02X}")
+    if state_raw & 0x10:  # EC_STATE_ACK
+        state_str += " (ACK)"
+    al_code = int(getattr(slave, "al_status", 0))
+    al_text = pysoem.al_status_code_to_string(al_code) if al_code else "OK"
+
+    # Port status (best-effort)
+    port_status = _read_port_status(slave) if coe else None
+
     return SlaveInfo(
         name=name,
         manufacturer_id=manufacturer_id,
@@ -94,4 +144,8 @@ def collect_slave_info(
         bootloader_version=bootloader_version,
         serial_number=serial_number,
         diagnostics=diagnostics,
+        state=state_str,
+        al_status_code=al_code,
+        al_status_text=al_text,
+        port_status=port_status,
     )

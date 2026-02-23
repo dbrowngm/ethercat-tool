@@ -2,6 +2,16 @@
 
 from dataclasses import dataclass
 
+# EtherCAT state machine states (EC_STATE_* values from SOEM)
+EC_STATE_NAMES: dict[int, str] = {
+    0: "NONE",
+    1: "INIT",
+    2: "PRE-OP",
+    3: "BOOT",
+    4: "SAFE-OP",
+    8: "OP",
+}
+
 
 @dataclass(frozen=True)
 class SlaveInfo:
@@ -17,6 +27,12 @@ class SlaveInfo:
     bootloader_version: str
     serial_number: str
     diagnostics: dict[str, str] | None  # best-effort link/error counters
+    # State machine
+    state: str  # e.g. PRE-OP, OP
+    al_status_code: int  # raw AL status
+    al_status_text: str  # human-readable from al_status_code_to_string
+    # Port status: {"A": "carrier"|"no carrier"|"open"|"closed"|"N/A", ...}
+    port_status: dict[str, str] | None
 
 
 @dataclass(frozen=True)

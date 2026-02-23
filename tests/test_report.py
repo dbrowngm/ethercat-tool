@@ -31,6 +31,10 @@ def test_build_markdown_one_slave_no_issues() -> None:
         bootloader_version="00",
         serial_number="",
         diagnostics=None,
+        state="PRE-OP",
+        al_status_code=0,
+        al_status_text="OK",
+        port_status={"A": "carrier", "B": "no carrier"},
     )
     md = build_markdown(summary, [slave], [])
     assert "**Slaves found:** 1" in md
@@ -57,6 +61,10 @@ def test_build_markdown_multiple_slaves_with_issues() -> None:
             bootloader_version="",
             serial_number="123",
             diagnostics=None,
+            state="OP",
+            al_status_code=0,
+            al_status_text="OK",
+            port_status=None,
         ),
         SlaveInfo(
             name="EL1008",
@@ -69,6 +77,10 @@ def test_build_markdown_multiple_slaves_with_issues() -> None:
             bootloader_version="00",
             serial_number="",
             diagnostics={"RX errors": "0"},
+            state="PRE-OP",
+            al_status_code=0,
+            al_status_text="OK",
+            port_status={"A": "carrier", "B": "carrier"},
         ),
     ]
     issues = [LinkIssue(1, "Slave did not reach OP")]

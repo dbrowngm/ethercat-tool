@@ -53,6 +53,8 @@ def scan(
                     LinkIssue(None, f"config_init returned wkc={wkc} (expected > 0)")
                 )
         else:
+            # Refresh slave states from network (for state machine and AL status)
+            master.read_state()
             # CoE reads must happen while master is open; set SDO timeout
             master.sdo_read_timeout = timeout_ms * 1000  # us
             for slave in master.slaves:

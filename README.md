@@ -67,6 +67,8 @@ ethercat-tool --adapter eth0 -v
 - **Topology:** chain order (Master → [Slave0] → [Slave1] → …) and per-slave details:
   - Manufacturer ID, Product Code, Revision
   - Device name, hardware/firmware/bootloader version, serial (from CoE when available)
+  - **State** (INIT, PRE-OP, SAFE-OP, OP) and **AL Status** (Application Layer status code)
+  - **Port status** (A/B/C/D: carrier/closed vs no carrier/open) when available
   - Optional diagnostic counters (link loss, etc.) when the device exposes them
 - **Link / init issues:** init failures, “no slaves found”, or other errors
 
@@ -88,4 +90,5 @@ The exact error is always in the report under **Link / init issues** and is also
 ## Limitations
 
 - **Link/CRC diagnostics:** Many EtherCAT slaves do not expose link-loss or RX error counters via CoE. The tool reports init success/failure and working counter; optional CoE diagnostic objects are read when present (best-effort).
+- **Port status:** Port A/B/C/D (carrier/closed vs no carrier/open) is read from the slave when PySOEM exposes `activeports` or the device supports CoE 0xF030; otherwise it is omitted.
 - **Real-time:** This tool is for troubleshooting only. It does not provide real-time cycle or distributed clock sync.

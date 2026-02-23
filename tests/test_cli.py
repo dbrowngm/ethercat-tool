@@ -64,6 +64,10 @@ def test_main_scan_produces_markdown() -> None:
         bootloader_version="",
         serial_number="",
         diagnostics=None,
+        state="PRE-OP",
+        al_status_code=0,
+        al_status_text="OK",
+        port_status=None,
     )
 
     with patch("ethercat_tool.cli.scan") as m_scan:
