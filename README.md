@@ -30,16 +30,16 @@ ethercat-tool --list-adapters
 # or: python -m ethercat_tool --list-adapters
 ```
 
-Scan an adapter and print a markdown report to stdout:
+Scan an adapter (report is saved to `ethercat-scan-{timestamp}.md`):
 
 ```bash
 ethercat-tool --adapter eth0
 ```
 
-Write the report to a file:
+Print the report to stdout instead of saving to a file:
 
 ```bash
-ethercat-tool --adapter eth0 --output report.md
+ethercat-tool --adapter eth0 --print
 ```
 
 Faster scan (topology and SII only, no CoE reads):

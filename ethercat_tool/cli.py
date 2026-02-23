@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+from datetime import datetime
 from typing import NoReturn
 
 import pysoem
@@ -33,10 +34,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Adapter name (e.g. eth0 or device ID from --list-adapters).",
     )
     p.add_argument(
-        "--output",
-        "-o",
-        metavar="PATH",
-        help="Write markdown report to file (default: stdout).",
+        "--print",
+        dest="print_results",
+        action="store_true",
+        help="Print scan results to stdout instead of writing to a file.",
     )
     p.add_argument(
         "--no-coe",
@@ -172,15 +173,22 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
         for issue in link_issues:
             print(f"ethercat-tool: {issue.message}", file=sys.stderr)
 
+    output_path: str | None = None
+    if not args.print_results:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        output_path = f"ethercat-scan-{timestamp}.md"
+
     md = build_markdown(
         summary,
         device_infos,
         link_issues,
-        output_path=args.output,
+        output_path=output_path,
         esi_lookup=esi_lookup,
     )
-    if not args.output:
+    if args.print_results:
         print(md)
+    else:
+        print(f"Report saved to {output_path}", file=sys.stderr)
     return 0
 
 

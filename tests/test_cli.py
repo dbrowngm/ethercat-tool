@@ -1,5 +1,6 @@
 """CLI tests with mocked scanner and pysoem."""
 
+import os
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
@@ -14,12 +15,12 @@ def test_parse_args_list_adapters() -> None:
 
 
 def test_parse_args_adapter_and_options() -> None:
-    """--adapter with --output and --no-coe and --timeout-ms."""
+    """--adapter with --print and --no-coe and --timeout-ms."""
     args = parse_args(
-        ["--adapter", "eth0", "--output", "out.md", "--no-coe", "--timeout-ms", "300"]
+        ["--adapter", "eth0", "--print", "--no-coe", "--timeout-ms", "300"]
     )
     assert args.adapter == "eth0"
-    assert args.output == "out.md"
+    assert args.print_results is True
     assert args.no_coe is True
     assert args.timeout_ms == 300
 
@@ -76,7 +77,7 @@ def test_parse_args_fetch_esi() -> None:
 
 
 def test_main_scan_produces_markdown() -> None:
-    """With --adapter and mocked scan, main produces markdown with topology."""
+    """With --adapter --print and mocked scan, main produces markdown to stdout."""
     from ethercat_tool.models import DeviceInfo, TopologySummary
 
     device_info = DeviceInfo(
@@ -105,7 +106,7 @@ def test_main_scan_produces_markdown() -> None:
             )
 
             with patch("sys.stdout", new_callable=StringIO) as out:
-                rc = main(["--adapter", "eth0", "--no-coe"])
+                rc = main(["--adapter", "eth0", "--no-coe", "--print"])
 
     assert rc == 0
     md = out.getvalue()
@@ -114,24 +115,29 @@ def test_main_scan_produces_markdown() -> None:
     assert "EL1008" in md
 
 
-def test_main_scan_with_output_file(tmp_path: str) -> None:
-    """With --output, report is written to file and not printed to stdout."""
-    out_file = tmp_path / "report.md"
+def test_main_scan_writes_file_by_default(tmp_path) -> None:
+    """Without --print, report is written to ethercat-scan-{timestamp}.md and not printed."""
+    orig_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
+            with patch("ethercat_tool.cli.scan") as m_scan:
+                from ethercat_tool.models import TopologySummary
 
-    with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
-        with patch("ethercat_tool.cli.scan") as m_scan:
-            from ethercat_tool.models import TopologySummary
+                m_scan.return_value = ([], TopologySummary("eth0", 0, False), [])
 
-            m_scan.return_value = ([], TopologySummary("eth0", 0, False), [])
+                with patch("sys.stdout", new_callable=StringIO) as out:
+                    rc = main(["--adapter", "eth0"])
 
-            with patch("sys.stdout", new_callable=StringIO) as out:
-                rc = main(["--adapter", "eth0", "--output", str(out_file)])
-
-    assert rc == 0
-    content = out_file.read_text()
-    assert content
-    assert "EtherCAT" in content
-    assert out.getvalue() == ""
+        assert rc == 0
+        files = list(tmp_path.glob("ethercat-scan-*.md"))
+        assert len(files) == 1
+        content = files[0].read_text()
+        assert content
+        assert "EtherCAT" in content
+        assert out.getvalue() == ""
+    finally:
+        os.chdir(orig_cwd)
 
 
 def test_main_permission_error_reexecs_with_sudo_unless_no_elevate() -> None:
@@ -173,6 +179,6 @@ def test_main_permission_error_no_reexec_with_no_elevate() -> None:
                 with patch("ethercat_tool.cli.os.execvp") as m_exec:
                     with patch("sys.stderr", new_callable=StringIO):
                         with patch("sys.stdout", new_callable=StringIO) as out:
-                            main(["--adapter", "en7", "--no-elevate"])
+                            main(["--adapter", "en7", "--no-elevate", "--print"])
             m_exec.assert_not_called()
     assert "could not open" in out.getvalue() or "Init failed" in out.getvalue()
