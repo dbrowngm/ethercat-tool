@@ -51,17 +51,24 @@ def test_main_adapter_required_without_list() -> None:
 
 def test_main_scan_produces_markdown() -> None:
     """With --adapter and mocked scan, main produces markdown with topology."""
-    mock_slave = MagicMock()
-    mock_slave.name = "EL1008"
-    mock_slave.man = 2
-    mock_slave.id = 0
-    mock_slave.rev = 0
+    from ethercat_tool.models import SlaveInfo, TopologySummary
+
+    slave_info = SlaveInfo(
+        name="EL1008",
+        manufacturer_id=2,
+        product_code=0,
+        revision=0,
+        device_name="EL1008",
+        hardware_version="",
+        firmware_version="",
+        bootloader_version="",
+        serial_number="",
+        diagnostics=None,
+    )
 
     with patch("ethercat_tool.cli.scan") as m_scan:
-        from ethercat_tool.models import TopologySummary
-
         m_scan.return_value = (
-            [mock_slave],
+            [slave_info],
             TopologySummary(adapter_name="eth0", slave_count=1, init_ok=True),
             [],
         )

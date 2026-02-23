@@ -7,10 +7,8 @@ from typing import NoReturn
 
 import pysoem
 
-from ethercat_tool.diagnostics import read_diagnostics
 from ethercat_tool.report import build_markdown
 from ethercat_tool.scanner import scan
-from ethercat_tool.slave_info import collect_slave_info
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -99,7 +97,12 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
         )
         return 1
 
-    slaves, summary, link_issues = scan(args.adapter, verbose=args.verbose)
+    slave_infos, summary, link_issues = scan(
+        args.adapter,
+        verbose=args.verbose,
+        coe=not args.no_coe,
+        timeout_ms=args.timeout_ms,
+    )
 
     # On permission-style init failure, re-run once under sudo unless root or --no-elevate.
     if (
@@ -117,18 +120,6 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
     if link_issues:
         for issue in link_issues:
             print(f"ethercat-tool: {issue.message}", file=sys.stderr)
-    slave_infos = []
-    for s in slaves:
-        diag = None
-        if not args.no_coe:
-            diag = read_diagnostics(s, timeout_ms=args.timeout_ms)
-        info = collect_slave_info(
-            s,
-            coe=not args.no_coe,
-            timeout_ms=args.timeout_ms,
-            diagnostics=diag,
-        )
-        slave_infos.append(info)
 
     md = build_markdown(
         summary,
