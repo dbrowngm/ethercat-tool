@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from ethercat_tool.device_info import collect_device_info
+from ethercat_tool.device_info import _read_port_status, collect_device_info
 
 
 def test_collect_device_info_no_coe() -> None:
@@ -91,6 +91,43 @@ def test_collect_device_info_with_diagnostics_injected() -> None:
     assert info.diagnostics is not None
     assert info.diagnostics["RX errors"] == "0"
     assert info.diagnostics["Link lost"] == "1"
+
+
+def test_read_port_status_via_fprd() -> None:
+    """Port status is read from ESC DL Status 0x0110 when _fprd is available."""
+    device = MagicMock()
+    # Bits 9,11 set = ports A,B carrier; 13,15 clear = C,D no carrier
+    def fprd(addr: int, size: int, timeout: int) -> bytes:
+        if addr == 0x0110 and size == 2:
+            return (1 << 9 | 1 << 11).to_bytes(2, "little")
+        return b""
+
+    device._fprd = fprd
+    device.sdo_read = MagicMock(return_value=b"")
+
+    result = _read_port_status(device)
+    assert result == {
+        "A": "carrier / open",
+        "B": "carrier / open",
+        "C": "no carrier / closed",
+        "D": "no carrier / closed",
+    }
+
+
+def test_read_port_status_fprd_preferred_over_coe() -> None:
+    """FPRD (ESC DL Status) is tried before CoE 0xF030."""
+    device = MagicMock()
+    device._fprd = lambda a, s, t: (0).to_bytes(2, "little") if a == 0x0110 else b""
+    device.sdo_read = MagicMock()
+
+    result = _read_port_status(device)
+    assert result == {
+        "A": "no carrier / closed",
+        "B": "no carrier / closed",
+        "C": "no carrier / closed",
+        "D": "no carrier / closed",
+    }
+    device.sdo_read.assert_not_called()
 
 
 def test_collect_device_info_missing_attributes_defaults() -> None:

@@ -45,7 +45,8 @@ def _sdo_read_string(
 def _read_port_status(device: Any) -> dict[str, str] | None:
     """Best-effort port status (A/B/C/D: carrier|no carrier|open|closed|N/A).
 
-    Tries activeports (if exposed by PySOEM) then CoE 0xF030.
+    Tries activeports (if exposed by PySOEM), then ESC DL Status 0x0110 via FPRD,
+    then CoE 0xF030.
     """
     # Try PySOEM device activeports (bitmap: bit0=portA, bit1=portB, ...)
     # Per SOEM: bit set = "port open and communication established" (Carrier / Open)
@@ -59,6 +60,24 @@ def _read_port_status(device: Any) -> dict[str, str] | None:
             else:
                 result[label] = "no carrier / closed"
         return result if result else None
+
+    # Try ESC DL Status 0x0110 via FPRD (bits 9,11,13,15 = comm established for ports A–D)
+    fprd = getattr(device, "_fprd", None)
+    if fprd is not None:
+        try:
+            raw = fprd(0x0110, 2, 500_000)
+            if raw and len(raw) >= 2:
+                val = int.from_bytes(raw[:2], "little")
+                result = {}
+                for i, label in enumerate(["A", "B", "C", "D"]):
+                    bit = 9 + (i * 2)  # 9, 11, 13, 15
+                    if val & (1 << bit):
+                        result[label] = "carrier / open"
+                    else:
+                        result[label] = "no carrier / closed"
+                return result if result else None
+        except Exception:
+            pass
 
     # Fallback: try CoE 0xF030 Physical Layer (some devices)
     try:

@@ -208,3 +208,4 @@ __marimo__/
 
 # EtherCAT scan output
 ethercat-scan-*.md
+.DS_Store
