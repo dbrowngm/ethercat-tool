@@ -6,6 +6,7 @@ using data from linuxcnc-ethercat/esi-data (YAML from ESI XML files).
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 import json
 import sys
 
@@ -52,11 +53,19 @@ def _extract_ids_from_device(device: dict) -> list[dict]:
     return ids if isinstance(ids, list) else []
 
 
-def _build_lookup_from_yaml(data: list) -> dict[tuple[int, int, int], EsiLookupResult]:
+def _build_lookup_from_yaml(
+    data: list,
+    *,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> dict[tuple[int, int, int], EsiLookupResult]:
     """Build (vendor_id, product_code, revision) -> EsiLookupResult from esi.yml structure."""
     lookup: dict[tuple[int, int, int], EsiLookupResult] = {}
     fallback: dict[tuple[int, int], EsiLookupResult] = {}
-    for device in data:
+    total = len(data)
+    report_every = max(1, total // 20)  # ~20 updates over the run
+    for i, device in enumerate(data):
+        if progress_callback and (i + 1) % report_every == 0:
+            progress_callback(i + 1, total)
         if not isinstance(device, dict):
             continue
         for id_entry in _extract_ids_from_device(device):
@@ -84,6 +93,8 @@ def _build_lookup_from_yaml(data: list) -> dict[tuple[int, int, int], EsiLookupR
             vp = (vendor_id, product_code)
             if vp not in fallback:
                 fallback[vp] = result
+    if progress_callback and total > 0:
+        progress_callback(total, total)
     # Merge fallback as (v, p, 0) for lookup fallback
     for (v, p), res in fallback.items():
         k = (v, p, 0)
@@ -140,7 +151,7 @@ def load_esi_lookup() -> dict[tuple[int, int, int], EsiLookupResult] | None:
 
     if cache_path.exists():
         try:
-            with open(cache_path) as f:
+            with open(cache_path, encoding="utf-8") as f:
                 cache = json.load(f)
             return _cache_to_lookup(cache)
         except (json.JSONDecodeError, OSError):
@@ -172,17 +183,40 @@ def _parse_esi_and_save_cache(esi_path: Path, cache_path: Path) -> bool:
     try:
         import yaml
 
-        with open(esi_path) as f:
+        print("  Loading YAML...", file=sys.stderr, flush=True)
+        with open(esi_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         if data is None or not isinstance(data, list):
             return False
-        lookup = _build_lookup_from_yaml(data)
+
+        def on_progress(processed: int, total: int) -> None:
+            pct = 100 * processed / total
+            print(
+                f"\r  Indexing devices: {processed:,} / {total:,} ({pct:.0f}%)",
+                end="",
+                file=sys.stderr,
+                flush=True,
+            )
+
+        lookup = _build_lookup_from_yaml(data, progress_callback=on_progress)
+        print(file=sys.stderr)
+        print("  Writing cache...", file=sys.stderr, flush=True)
         esi_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(cache_path, "w") as f:
+        with open(cache_path, "w", encoding="utf-8") as f:
             json.dump(_lookup_to_cache(lookup), f)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"ESI parse/index failed: {e}", file=sys.stderr)
         return False
+
+
+def _format_bytes(n: int) -> str:
+    """Format bytes as human-readable size (e.g. 44.2 MB)."""
+    for unit in ("B", "KB", "MB"):
+        if n < 1024:
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+        n /= 1024
+    return f"{n:.1f} GB"
 
 
 def fetch_esi_data() -> bool:
@@ -194,11 +228,45 @@ def fetch_esi_data() -> bool:
         data_dir = esi_path.parent
         data_dir.mkdir(parents=True, exist_ok=True)
 
-        with urllib.request.urlopen(ESI_YAML_URL, timeout=120) as resp:
-            data = resp.read()
+        # ~44MB file; use 10 min timeout for slow networks (e.g. Windows, corporate)
+        req = urllib.request.Request(ESI_YAML_URL)
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            total = resp.headers.get("Content-Length")
+            total_int = int(total) if total else None
+            chunks: list[bytes] = []
+            chunk_size = 512 * 1024  # 512 KB
+            downloaded = 0
+
+            while True:
+                chunk = resp.read(chunk_size)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                downloaded += len(chunk)
+                if total_int:
+                    pct = 100 * downloaded / total_int
+                    print(
+                        f"\r  {_format_bytes(downloaded)} / {_format_bytes(total_int)} ({pct:.0f}%)",
+                        end="",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"\r  {_format_bytes(downloaded)} downloaded...",
+                        end="",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+
+        print(file=sys.stderr)  # newline after progress
+        data = b"".join(chunks)
         with open(esi_path, "wb") as f:
             f.write(data)
-        # Build cache immediately so first scan is fast (~44MB YAML parse takes 1–2 min)
+        print("Parsing and indexing devices...", file=sys.stderr)
+        # Build cache immediately so first scan is fast
         return _parse_esi_and_save_cache(esi_path, cache_path)
-    except Exception:
+    except Exception as e:
+        print(file=sys.stderr)  # ensure we don't leave progress on same line
+        print(f"ESI download failed: {e}", file=sys.stderr)
         return False
