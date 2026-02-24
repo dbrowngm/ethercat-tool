@@ -9,13 +9,11 @@ EtherCAT network troubleshooting: scan devices, topology map (markdown), and lin
 
 ```bash
 pip install -e .
-# or from PyPI when published:
-# pip install ethercat-tool
 ```
 
 ### Platform requirements
 
-- **Windows:** [Npcap](https://nmap.org/npcap/) or WinPcap (for raw Ethernet). Adapter names are device IDs (use `--list-adapters`).
+- **Windows:** [Npcap](https://nmap.org/npcap/) or WinPcap (for raw Ethernet). Use `--list-adapters` to see adapters. You can use the **index** (0, 1, 2…) instead of the full device ID: `--adapter 0`.
 - **Linux:** Run with sufficient privileges (e.g. root or `cap_net_raw`). Adapter names: `eth0`, etc.
 - **macOS:** PySOEM 1.1.5+; a compatible NIC/driver may be needed (e.g. USB-Ethernet). Use `--list-adapters` to see available interfaces.
 
@@ -26,38 +24,40 @@ If opening the adapter fails with a permission-style error, the tool will **auto
 List available network adapters:
 
 ```bash
-ethercat-tool --list-adapters
-# or: python -m ethercat_tool --list-adapters
+python -m ethercat_tool --list-adapters
 ```
+
+Output shows index, description, and device path. On Windows, use the index (e.g. `--adapter 0`) instead of copying the full GUID.
 
 Scan an adapter (report is saved to `ethercat-scan-{timestamp}.md`):
 
 ```bash
-ethercat-tool --adapter eth0
+python -m ethercat_tool --adapter eth0
+# Windows: python -m ethercat_tool --adapter 0
 ```
 
 Print the report to stdout instead of saving to a file:
 
 ```bash
-ethercat-tool --adapter eth0 --print
+python -m ethercat_tool --adapter eth0 --print
 ```
 
 Faster scan (topology and SII only, no CoE reads):
 
 ```bash
-ethercat-tool --adapter eth0 --no-coe
+python -m ethercat_tool --adapter eth0 --no-coe
 ```
 
 SDO read timeout (default 500 ms):
 
 ```bash
-ethercat-tool --adapter eth0 --timeout-ms 300
+python -m ethercat_tool --adapter eth0 --timeout-ms 300
 ```
 
 Validate scan against a TwinCAT EtherCAT config file (checks Device Name vs ProductRevision):
 
 ```bash
-ethercat-tool --adapter eth0 --validate-config config.xml
+python -m ethercat_tool --adapter eth0 --validate-config config.xml
 ```
 
 Mismatches are reported as `Expected: EL1014, Found: EL2904` (for example) and included in the report.
@@ -67,7 +67,7 @@ Mismatches are reported as `Expected: EL1014, Found: EL2904` (for example) and i
 More detail when init fails (traceback and hints):
 
 ```bash
-ethercat-tool --adapter eth0 -v
+python -m ethercat_tool --adapter eth0 -v
 # or --verbose
 ```
 
@@ -78,7 +78,7 @@ The scan report can decode manufacturer ID and product code to human-readable na
 **First-time setup:** Download the ESI database (one-time, ~44 MB). Re-running replaces any existing data:
 
 ```bash
-ethercat-tool --fetch-esi
+python -m ethercat_tool --fetch-esi
 ```
 
 **Automatic prompt:** If no ESI data is present and you run a scan interactively, the tool will prompt: "No ESI device data found. Decode manufacturer/product names? [y/N]". Answer `y` to download.

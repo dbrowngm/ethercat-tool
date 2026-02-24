@@ -26,7 +26,7 @@ def test_parse_args_adapter_and_options() -> None:
 
 
 def test_main_list_adapters_prints_and_returns_0() -> None:
-    """With --list-adapters, main prints adapter list and returns 0."""
+    """With --list-adapters, main prints adapter list with index and returns 0."""
     fake_adapter = MagicMock()
     fake_adapter.name = "eth0"
     fake_adapter.desc = "Ethernet"
@@ -38,8 +38,10 @@ def test_main_list_adapters_prints_and_returns_0() -> None:
             rc = main(["--list-adapters"])
 
     assert rc == 0
-    assert "eth0" in out.getvalue()
-    assert "Ethernet" in out.getvalue()
+    outval = out.getvalue()
+    assert "0" in outval
+    assert "eth0" in outval
+    assert "Ethernet" in outval
 
 
 def test_main_adapter_required_without_list() -> None:
@@ -74,6 +76,53 @@ def test_parse_args_fetch_esi() -> None:
     args = parse_args(["--fetch-esi", "--no-esi-prompt"])
     assert args.fetch_esi is True
     assert args.no_esi_prompt is True
+
+
+def test_main_scan_with_adapter_index_resolves_to_name() -> None:
+    """--adapter 0 resolves to the first adapter's device name on Windows."""
+    from ethercat_tool.models import DeviceInfo, TopologySummary
+
+    fake_adapters = [
+        MagicMock(name="\\Device\\NPF_{GUID}", desc=b"ASIX USB Ethernet"),
+    ]
+    fake_adapters[0].name = "\\Device\\NPF_{6729E67D-3DD0-435D-9E7E-AC64A26C36FC}"
+
+    device_info = DeviceInfo(
+        name="EL1008",
+        manufacturer_id=2,
+        product_code=0,
+        revision=0,
+        device_name="EL1008",
+        hardware_version="",
+        firmware_version="",
+        bootloader_version="",
+        serial_number="",
+        diagnostics=None,
+        state="PRE-OP",
+        al_status_code=0,
+        al_status_text="OK",
+        port_status=None,
+    )
+
+    with patch("ethercat_tool.cli.pysoem") as m_pysoem:
+        m_pysoem.find_adapters.return_value = fake_adapters
+        with patch("ethercat_tool.cli.load_esi_lookup", return_value=None):
+            with patch("ethercat_tool.cli.scan") as m_scan:
+                m_scan.return_value = (
+                    [device_info],
+                    TopologySummary(
+                        adapter_name="\\Device\\NPF_{6729E67D-3DD0-435D-9E7E-AC64A26C36FC}",
+                        device_count=1,
+                        init_ok=True,
+                    ),
+                    [],
+                )
+                with patch("sys.stdout", new_callable=StringIO) as out:
+                    rc = main(["--adapter", "0", "--no-coe", "--print"])
+
+    assert rc == 0
+    m_scan.assert_called_once()
+    assert m_scan.call_args[0][0] == "\\Device\\NPF_{6729E67D-3DD0-435D-9E7E-AC64A26C36FC}"
 
 
 def test_main_scan_produces_markdown() -> None:

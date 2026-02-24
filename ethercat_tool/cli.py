@@ -32,7 +32,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--adapter",
         metavar="NAME",
-        help="Adapter name (e.g. eth0 or device ID from --list-adapters).",
+        help="Adapter: name (eth0, en7), index (0, 1), or Windows device ID.",
     )
     p.add_argument(
         "--print",
@@ -103,13 +103,36 @@ def _reexec_with_sudo(user_argv: list[str]) -> NoReturn:
     os.execvp("sudo", argv)
 
 
+def _adapter_desc(desc: object) -> str:
+    """Normalize adapter description (decode bytes on Windows)."""
+    if isinstance(desc, bytes):
+        try:
+            return desc.decode("utf-8", errors="replace")
+        except Exception:
+            return str(desc)
+    return str(desc) if desc else ""
+
+
 def _list_adapters() -> int:
     adapters = pysoem.find_adapters()
-    for a in adapters:
+    for i, a in enumerate(adapters):
         name = getattr(a, "name", "")
-        desc = getattr(a, "desc", "")
-        print(f"{name}\t{desc}")
+        desc = _adapter_desc(getattr(a, "desc", ""))
+        print(f"{i}\t{desc}\t({name})")
     return 0
+
+
+def _resolve_adapter(user_input: str) -> str | None:
+    """Resolve --adapter to the actual device name. Handles numeric index on Windows."""
+    if not user_input.isdigit():
+        return user_input  # Use as-is for eth0, en7, or full Windows path
+    adapters = list(pysoem.find_adapters())
+    if not adapters:
+        return None
+    idx = int(user_input)
+    if 0 <= idx < len(adapters):
+        return getattr(adapters[idx], "name", "")
+    return None
 
 
 def _ensure_esi_data(args: argparse.Namespace) -> bool:
@@ -118,7 +141,7 @@ def _ensure_esi_data(args: argparse.Namespace) -> bool:
         return True
     if args.fetch_esi:
         print(
-            "Downloading ESI device database (may take 1–2 minutes)...",
+            "Downloading ESI device database (~44 MB, may take several minutes on slow networks)...",
             file=sys.stderr,
         )
         if fetch_esi_data():
@@ -135,7 +158,7 @@ def _ensure_esi_data(args: argparse.Namespace) -> bool:
             ).strip().lower()
             if reply in ("y", "yes"):
                 print(
-                    "Downloading ESI device database (may take 1–2 minutes)...",
+                    "Downloading ESI device database (~44 MB, may take several minutes on slow networks)...",
                     file=sys.stderr,
                 )
                 if fetch_esi_data():
@@ -153,11 +176,19 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
         )
         return 1
 
+    adapter_name = _resolve_adapter(args.adapter)
+    if adapter_name is None:
+        print(
+            f"Error: Invalid adapter '{args.adapter}'. Use --list-adapters to see adapters.",
+            file=sys.stderr,
+        )
+        return 1
+
     _ensure_esi_data(args)
     esi_lookup = load_esi_lookup()
 
     device_infos, summary, link_issues = scan(
-        args.adapter,
+        adapter_name,
         verbose=args.verbose,
         coe=not args.no_coe,
         timeout_ms=args.timeout_ms,
@@ -227,7 +258,7 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
 def _run_fetch_esi() -> int:
     """Fetch ESI data and exit. Replaces any existing data."""
     print(
-        "Downloading ESI device database (may take 1–2 minutes)...",
+        "Downloading ESI device database (~44 MB, may take several minutes on slow networks)...",
         file=sys.stderr,
     )
     if fetch_esi_data():
