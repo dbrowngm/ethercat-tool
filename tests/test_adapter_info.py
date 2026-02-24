@@ -104,3 +104,64 @@ def test_get_adapter_info_handles_missing_interface() -> None:
             info = get_adapter_info("nonexistent0")
     assert info.name == "nonexistent0"
     assert info.as_dict() == {}
+
+
+def test_get_adapter_info_windows_matches_by_description() -> None:
+    """Windows matches adapter by pysoem description (Get-NetAdapter InterfaceDescription)."""
+    npf_name = r"\Device\NPF_{6729E67D-3DD0-435D-9E7E-AC64A26C36FC}"
+    ps_out = """DESC=Parallels VirtIO Ethernet Adapter|MAC=00-1C-42-88-8B-40|Status=Up|LinkSpeed=1 Gbps
+DESC=ASIX USB to Gigabit Ethernet Family Adapter|MAC=A0-CE-C8-65-FE-B6|Status=Up|LinkSpeed=100 Mbps
+"""
+    fake_adapters = [
+        type("Adapter", (), {"name": npf_name, "desc": b"ASIX USB to Gigabit Ethernet Family Adapter"})(),
+    ]
+
+    with patch("sys.platform", "win32"):
+        with patch("ethercat_tool.adapter_info.pysoem") as m_pysoem:
+            m_pysoem.find_adapters.return_value = fake_adapters
+            with patch("ethercat_tool.adapter_info._run") as m_run:
+                m_run.return_value = ps_out
+                info = get_adapter_info(npf_name)
+
+    assert info.mac_address == "A0:CE:C8:65:FE:B6"
+    assert info.link_state == "up"
+    assert info.link_speed == "100 Mbps"
+    assert info.hardware_port == "ASIX USB to Gigabit Ethernet Family Adapter"
+
+
+def test_get_adapter_info_windows_fallback_ipconfig() -> None:
+    """Windows falls back to ipconfig when PowerShell has no match; matches by description."""
+    npf_name = r"\Device\NPF_{6729E67D-3DD0-435D-9E7E-AC64A26C36FC}"
+    ipconfig_out = """
+Ethernet adapter Ethernet:
+
+   Description . . . . . . . . . . . : Parallels VirtIO Ethernet Adapter
+   Physical Address. . . . . . . . . : 00-1C-42-88-8B-40
+   Media State . . . . . . . . . . . : Media disconnected
+
+Ethernet adapter Ethernet 2:
+
+   Description . . . . . . . . . . . : ASIX USB to Gigabit Ethernet Family Adapter
+   Physical Address. . . . . . . . . : A0-CE-C8-65-FE-B6
+   Media State . . . . . . . . . . . : Media disconnected
+"""
+    fake_adapters = [
+        type("Adapter", (), {"name": npf_name, "desc": b"ASIX USB to Gigabit Ethernet Family Adapter"})(),
+    ]
+
+    with patch("sys.platform", "win32"):
+        with patch("ethercat_tool.adapter_info.pysoem") as m_pysoem:
+            m_pysoem.find_adapters.return_value = fake_adapters
+            with patch("ethercat_tool.adapter_info._run") as m_run:
+                def run_side_effect(cmd, timeout=5.0):
+                    if cmd[0] == "powershell":
+                        return ""
+                    if cmd[0] == "ipconfig":
+                        return ipconfig_out
+                    return ""
+                m_run.side_effect = run_side_effect
+                info = get_adapter_info(npf_name)
+
+    assert info.mac_address == "A0:CE:C8:65:FE:B6"
+    assert info.hardware_port == "ASIX USB to Gigabit Ethernet Family Adapter"
+    assert info.link_state == "down"

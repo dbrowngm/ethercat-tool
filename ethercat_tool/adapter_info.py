@@ -6,6 +6,11 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
+try:
+    import pysoem
+except ImportError:
+    pysoem = None  # type: ignore[assignment]
+
 
 @dataclass
 class AdapterInfo:
@@ -171,11 +176,185 @@ def _get_adapter_info_linux(ifname: str) -> AdapterInfo:
     return info
 
 
+def _get_adapter_desc_from_pysoem(ifname: str) -> str:
+    """Get adapter description from pysoem/Npcap by matching adapter name."""
+    if not pysoem:
+        return ""
+    try:
+        for a in pysoem.find_adapters():
+            if getattr(a, "name", "") == ifname:
+                desc = getattr(a, "desc", "")
+                if isinstance(desc, bytes):
+                    return desc.decode("utf-8", errors="replace").strip()
+                return str(desc).strip() if desc else ""
+    except Exception:
+        pass
+    return ""
+
+
+def _parse_ipconfig_adapters(ipconfig_out: str) -> list[dict[str, str]]:
+    """Parse ipconfig /all into list of adapter dicts with mac, desc, media_state."""
+    adapters: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    in_block = False
+
+    for line in ipconfig_out.splitlines():
+        if "adapter" in line.lower() and ":" in line:
+            if in_block and current.get("mac") and "loopback" not in current.get("desc", "").lower():
+                adapters.append(current)
+            current = {"mac": "", "desc": "", "media_state": ""}
+            in_block = True
+        elif in_block:
+            if "Physical Address" in line and ":" in line:
+                m = re.search(r":\s*([0-9a-fA-F\-]{17})", line)
+                if m:
+                    current["mac"] = m.group(1)
+            elif "Description" in line and ":" in line:
+                current["desc"] = line.split(":", 1)[1].strip()
+            elif "Media State" in line and ":" in line:
+                current["media_state"] = line.split(":", 1)[1].strip()
+
+    if in_block and current.get("mac") and "loopback" not in current.get("desc", "").lower():
+        adapters.append(current)
+    return adapters
+
+
+def _match_desc(a: str, b: str) -> bool:
+    """True if descriptions refer to the same adapter (case-insensitive contains or equals)."""
+    if not a or not b:
+        return False
+    a_norm = a.lower().strip()
+    b_norm = b.lower().strip()
+    return a_norm == b_norm or a_norm in b_norm or b_norm in a_norm
+
+
+def _get_adapter_info_windows(ifname: str) -> AdapterInfo:
+    """Gather adapter info on Windows via PowerShell Get-NetAdapter or ipconfig.
+
+    Uses pysoem's adapter description (same list user picked from) to match the correct
+    adapter in Get-NetAdapter/ipconfig. This avoids wrong matches when GUID differs
+    from Windows or when multiple adapters exist (e.g. Parallels + ASIX USB).
+    """
+    info = AdapterInfo(name=ifname)
+    adapter_desc = _get_adapter_desc_from_pysoem(ifname)
+
+    def _apply_adapter(mac: str, desc: str, media: str) -> None:
+        if mac:
+            info.mac_address = mac.replace("-", ":").upper()
+        if desc:
+            info.hardware_port = desc
+        if media:
+            info.link_state = (
+                "up" if "disconnected" not in media.lower() else "down"
+            )
+
+    # 1. Try PowerShell Get-NetAdapter, match by InterfaceDescription
+    ps_script = """
+    Get-NetAdapter | ForEach-Object {
+        $d = if ($_.InterfaceDescription) { $_.InterfaceDescription -replace '\\|', ' ' } else { '' }
+        "DESC=" + $d + "|MAC=" + $_.MacAddress + "|Status=" + $_.Status + "|LinkSpeed=" + $_.LinkSpeed
+    }
+    """
+    ps_out = _run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            ps_script.strip(),
+        ]
+    )
+    if ps_out and adapter_desc:
+        for line in ps_out.splitlines():
+            parts = dict(p.split("=", 1) for p in line.split("|") if "=" in p)
+            desc = parts.get("DESC", "").strip()
+            if _match_desc(adapter_desc, desc):
+                mac = parts.get("MAC", "").strip()
+                status = parts.get("Status", "").strip()
+                speed = parts.get("LinkSpeed", "").strip()
+                if mac:
+                    info.mac_address = mac.replace("-", ":").upper()
+                if status:
+                    info.link_state = status.lower()
+                if speed:
+                    info.link_speed = speed
+                if desc:
+                    info.hardware_port = desc
+                return info
+
+    # 2. Fallback: ipconfig /all, match by Description
+    ipconfig_out = _run(["ipconfig", "/all"])
+    if ipconfig_out:
+        for ad in _parse_ipconfig_adapters(ipconfig_out):
+            if adapter_desc and _match_desc(adapter_desc, ad.get("desc", "")):
+                _apply_adapter(
+                    ad.get("mac", ""),
+                    ad.get("desc", ""),
+                    ad.get("media_state", ""),
+                )
+                return info
+
+    # 3. No description: try GUID match (Get-NetAdapter by InterfaceGuid)
+    guid_match = re.search(
+        r"NPF_\{([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\}",
+        ifname,
+    )
+    if guid_match and not info.mac_address:
+        guid_normalized = guid_match.group(1).upper().replace("-", "")
+        ps_script = f"""
+        $adapter = Get-NetAdapter | Where-Object {{
+            ($_.InterfaceGuid.ToString() -replace '[{{\\-}}]','').ToUpper() -eq '{guid_normalized}'
+        }} | Select-Object -First 1
+        if ($adapter) {{
+            'MAC=' + $adapter.MacAddress
+            'Status=' + $adapter.Status
+            'LinkSpeed=' + $adapter.LinkSpeed
+            'InterfaceDescription=' + ($adapter.InterfaceDescription -replace '\\|', ' ')
+        }}
+        """
+        out = _run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                ps_script.strip(),
+            ]
+        )
+        if out:
+            for line in out.splitlines():
+                line = line.strip()
+                if "=" in line:
+                    key, _, val = line.partition("=")
+                    val = val.strip()
+                    if key == "MAC" and val:
+                        info.mac_address = val.replace("-", ":").upper()
+                    elif key == "Status" and val:
+                        info.link_state = val.lower()
+                    elif key == "LinkSpeed" and val:
+                        info.link_speed = val
+                    elif key == "InterfaceDescription" and val:
+                        info.hardware_port = val
+
+    # 4. Last resort: first non-loopback adapter from ipconfig
+    if not info.mac_address and ipconfig_out:
+        for ad in _parse_ipconfig_adapters(ipconfig_out):
+            _apply_adapter(
+                ad.get("mac", ""),
+                ad.get("desc", ""),
+                ad.get("media_state", ""),
+            )
+            break
+
+    return info
+
+
 def get_adapter_info(ifname: str) -> AdapterInfo:
     """Gather adapter details for the given interface. Best-effort; missing fields are empty."""
     if sys.platform == "darwin":
         return _get_adapter_info_macos(ifname)
     if sys.platform.startswith("linux"):
         return _get_adapter_info_linux(ifname)
-    # Windows: minimal - could add ipconfig / getmac parsing later
+    if sys.platform == "win32":
+        return _get_adapter_info_windows(ifname)
     return AdapterInfo(name=ifname)

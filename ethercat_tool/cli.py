@@ -195,10 +195,11 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
     )
 
     # On permission-style init failure, re-run once under sudo unless root or --no-elevate.
+    # geteuid is Unix-only; on Windows we skip the sudo re-exec.
     if (
         link_issues
         and not args.no_elevate
-        and os.geteuid() != 0
+        and (getattr(os, "geteuid", lambda: 0)() != 0)
         and len(link_issues) == 1
         and _looks_like_permission_error(link_issues[0].message)
     ):
