@@ -5,11 +5,58 @@ EtherCAT network troubleshooting: scan devices, topology map (markdown), and lin
 - **Cross-platform:** macOS, Windows (with Npcap), Linux (with privileges)
 - **One-shot CLI:** list adapters, scan an adapter, print or save a markdown report, then exit
 
+**Tested with:** Python 3.13.12 on Windows • Python 3.12.9 on macOS
+
 ## Install
+
+### 1. Install Python
+
+If you don’t have Python installed:
+
+- **Windows:** Download the installer from [python.org/downloads](https://www.python.org/downloads/). Run it and check **“Add Python to PATH”** before finishing.
+- **macOS:** Use Homebrew (`brew install python`) or download from [python.org/downloads](https://www.python.org/downloads/).
+- **Linux:** Use your package manager (e.g. `sudo apt install python3 python3-pip` on Ubuntu/Debian).
+
+Check the install:
+
+```bash
+python --version
+```
+
+You should see Python 3.10 or newer.
+
+### 2. Clone the repository
+
+```bash
+git clone https://github.com/dbrowngm/ethercat-tool.git
+cd ethercat-tool
+```
+
+### 3. (Recommended) Create a virtual environment
+
+A virtual environment keeps this project’s dependencies separate from your system Python.
+
+```bash
+python -m venv venv
+```
+
+Then activate it:
+
+- **Windows (Command Prompt):** `venv\Scripts\activate`
+- **Windows (PowerShell):** `venv\Scripts\Activate.ps1`
+- **macOS / Linux:** `source venv/bin/activate`
+
+You’ll see `(venv)` at the start of your prompt when it’s active.
+
+### 4. Install the tool
+
+With the virtual environment activated (or using your system Python):
 
 ```bash
 pip install -e .
 ```
+
+`pip` installs the Python packages. The `-e` flag installs the tool in “editable” mode so changes in the source take effect without reinstalling.
 
 ### Platform requirements
 
