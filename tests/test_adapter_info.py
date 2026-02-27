@@ -25,7 +25,7 @@ eth0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
 """
     with patch("sys.platform", "darwin"):
         with patch("ethercat_tool.adapter_info._run") as m_run:
-            def run_side_effect(cmd, timeout=5.0):
+            def run_side_effect(cmd: list[str], timeout: float = 5.0) -> str:
                 if cmd[0] == "ifconfig":
                     return ifconfig_out
                 return ""
@@ -44,13 +44,17 @@ eth0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
 
 def test_get_adapter_info_linux_parses_ip_and_ethtool() -> None:
     """Linux ip link and ethtool output is parsed correctly."""
-    ip_link = "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP\n    link/ether aa:bb:cc:dd:ee:ff brd ff:ff:ff:ff:ff:ff"
+    ip_link = (
+        "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 "
+        "qdisc pfifo_fast state UP\n"
+        "    link/ether aa:bb:cc:dd:ee:ff brd ff:ff:ff:ff:ff:ff"
+    )
     ethtool_out = "Speed: 1000Mb/s\nDuplex: Full\nLink detected: yes\nDriver: igb"
     ip_addr = "2: eth0: ...\n    inet 10.0.0.1/24 brd 10.0.0.255 scope global eth0"
 
     with patch("sys.platform", "linux"):
         with patch("ethercat_tool.adapter_info._run") as m_run:
-            def run_side_effect(cmd, timeout=5.0):
+            def run_side_effect(cmd: list[str], timeout: float = 5.0) -> str:
                 if cmd[:2] == ["ip", "link"]:
                     return ip_link
                 if cmd[:2] == ["ip", "-4"]:
@@ -84,7 +88,7 @@ Device: en0
 """
     with patch("sys.platform", "darwin"):
         with patch("ethercat_tool.adapter_info._run") as m_run:
-            def run_side_effect(cmd, timeout=5.0):
+            def run_side_effect(cmd: list[str], timeout: float = 5.0) -> str:
                 if cmd[0] == "ifconfig":
                     return ifconfig_out
                 if cmd[0] == "networksetup":
@@ -109,11 +113,18 @@ def test_get_adapter_info_handles_missing_interface() -> None:
 def test_get_adapter_info_windows_matches_by_description() -> None:
     """Windows matches adapter by pysoem description (Get-NetAdapter InterfaceDescription)."""
     npf_name = r"\Device\NPF_{6729E67D-3DD0-435D-9E7E-AC64A26C36FC}"
-    ps_out = """DESC=Parallels VirtIO Ethernet Adapter|MAC=00-1C-42-88-8B-40|Status=Up|LinkSpeed=1 Gbps
-DESC=ASIX USB to Gigabit Ethernet Family Adapter|MAC=A0-CE-C8-65-FE-B6|Status=Up|LinkSpeed=100 Mbps
-"""
+    ps_out = (
+        "DESC=Parallels VirtIO Ethernet Adapter|MAC=00-1C-42-88-8B-40|"
+        "Status=Up|LinkSpeed=1 Gbps\n"
+        "DESC=ASIX USB to Gigabit Ethernet Family Adapter|MAC=A0-CE-C8-65-FE-B6|"
+        "Status=Up|LinkSpeed=100 Mbps\n"
+    )
     fake_adapters = [
-        type("Adapter", (), {"name": npf_name, "desc": b"ASIX USB to Gigabit Ethernet Family Adapter"})(),
+        type(
+            "Adapter",
+            (),
+            {"name": npf_name, "desc": b"ASIX USB to Gigabit Ethernet Family Adapter"},
+        )(),
     ]
 
     with patch("sys.platform", "win32"):
@@ -146,14 +157,18 @@ Ethernet adapter Ethernet 2:
    Media State . . . . . . . . . . . : Media disconnected
 """
     fake_adapters = [
-        type("Adapter", (), {"name": npf_name, "desc": b"ASIX USB to Gigabit Ethernet Family Adapter"})(),
+        type(
+            "Adapter",
+            (),
+            {"name": npf_name, "desc": b"ASIX USB to Gigabit Ethernet Family Adapter"},
+        )(),
     ]
 
     with patch("sys.platform", "win32"):
         with patch("ethercat_tool.adapter_info.pysoem") as m_pysoem:
             m_pysoem.find_adapters.return_value = fake_adapters
             with patch("ethercat_tool.adapter_info._run") as m_run:
-                def run_side_effect(cmd, timeout=5.0):
+                def run_side_effect(cmd: list[str], timeout: float = 5.0) -> str:
                     if cmd[0] == "powershell":
                         return ""
                     if cmd[0] == "ipconfig":

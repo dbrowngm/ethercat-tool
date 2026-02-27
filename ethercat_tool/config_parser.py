@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ethercat_tool.esi_data import EsiLookupResult
     from ethercat_tool.models import DeviceInfo
 
 _NA = "N/A"
@@ -40,11 +41,11 @@ def parse_config(config_path: str | Path) -> list[str]:
 
     root = tree.getroot()
 
-    def local_tag(elem):
+    def local_tag(elem: ET.Element) -> str:
         tag = elem.tag or ""
         return tag.split("}")[-1] if "}" in tag else tag
 
-    def find_child(parent, name: str):
+    def find_child(parent: ET.Element, name: str) -> ET.Element | None:
         for c in parent:
             if local_tag(c) == name:
                 return c
@@ -80,8 +81,8 @@ def parse_config(config_path: str | Path) -> list[str]:
 
 
 def _get_found_device_type(
-    device: "DeviceInfo",
-    esi_lookup: dict[tuple[int, int, int], object] | None,
+    device: DeviceInfo,
+    esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None,
 ) -> str:
     """Get the device type string for a scanned device.
 
@@ -115,9 +116,9 @@ class ConfigValidationResult:
 
 
 def validate_scan(
-    device_infos: list["DeviceInfo"],
+    device_infos: list[DeviceInfo],
     expected_types: list[str],
-    esi_lookup: dict[tuple[int, int, int], object] | None = None,
+    esi_lookup: dict[tuple[int, int, int], EsiLookupResult] | None = None,
 ) -> ConfigValidationResult:
     """Compare scanned devices to expected types from config.
 

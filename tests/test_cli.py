@@ -2,6 +2,7 @@
 
 import os
 from io import StringIO
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from ethercat_tool.cli import main, parse_args
@@ -117,7 +118,7 @@ def test_main_scan_with_adapter_index_resolves_to_name() -> None:
                     ),
                     [],
                 )
-                with patch("sys.stdout", new_callable=StringIO) as out:
+                with patch("sys.stdout", new_callable=StringIO):
                     rc = main(["--adapter", "0", "--no-coe", "--print"])
 
     assert rc == 0
@@ -164,7 +165,7 @@ def test_main_scan_produces_markdown() -> None:
     assert "EL1008" in md
 
 
-def test_main_scan_writes_file_by_default(tmp_path) -> None:
+def test_main_scan_writes_file_by_default(tmp_path: Path) -> None:
     """Without --print, report is written to ethercat-scan-{timestamp}.md and not printed."""
     orig_cwd = os.getcwd()
     try:

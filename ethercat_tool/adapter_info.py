@@ -9,7 +9,7 @@ from dataclasses import dataclass
 try:
     import pysoem
 except ImportError:
-    pysoem = None  # type: ignore[assignment]
+    pysoem = None
 
 
 @dataclass
@@ -199,8 +199,22 @@ def _parse_ipconfig_adapters(ipconfig_out: str) -> list[dict[str, str]]:
     in_block = False
 
     for line in ipconfig_out.splitlines():
-        if "adapter" in line.lower() and ":" in line:
-            if in_block and current.get("mac") and "loopback" not in current.get("desc", "").lower():
+        # Section header: "Ethernet adapter Name:" or "Wireless LAN adapter Name:"
+        # Avoid matching lines like "Description ... : ... Adapter", which refer to
+        # the adapter name, not a new adapter block.
+        is_adapter_header = (
+            "adapter" in line.lower()
+            and ":" in line
+            and "Description" not in line
+            and "Physical Address" not in line
+            and "Media State" not in line
+        )
+        if is_adapter_header:
+            if (
+                in_block
+                and current.get("mac")
+                and "loopback" not in current.get("desc", "").lower()
+            ):
                 adapters.append(current)
             current = {"mac": "", "desc": "", "media_state": ""}
             in_block = True
@@ -251,8 +265,13 @@ def _get_adapter_info_windows(ifname: str) -> AdapterInfo:
     # 1. Try PowerShell Get-NetAdapter, match by InterfaceDescription
     ps_script = """
     Get-NetAdapter | ForEach-Object {
-        $d = if ($_.InterfaceDescription) { $_.InterfaceDescription -replace '\\|', ' ' } else { '' }
-        "DESC=" + $d + "|MAC=" + $_.MacAddress + "|Status=" + $_.Status + "|LinkSpeed=" + $_.LinkSpeed
+        $d = if ($_.InterfaceDescription) {
+            $_.InterfaceDescription -replace '\\|', ' '
+        } else {
+            ''
+        }
+        "DESC=" + $d + "|MAC=" + $_.MacAddress + "|Status=" + $_.Status +
+        "|LinkSpeed=" + $_.LinkSpeed
     }
     """
     ps_out = _run(

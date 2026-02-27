@@ -4,11 +4,11 @@ Decodes manufacturer ID, product code, revision to human-readable names
 using data from linuxcnc-ethercat/esi-data (YAML from ESI XML files).
 """
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Callable
 import json
 import sys
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 
 ESI_YAML_URL = "https://raw.githubusercontent.com/linuxcnc-ethercat/esi-data/main/esi.yml"
 CACHE_FILENAME = "esi_cache.json"
@@ -146,7 +146,10 @@ def has_esi_data() -> bool:
 
 
 def load_esi_lookup() -> dict[tuple[int, int, int], EsiLookupResult] | None:
-    """Load ESI lookup from cache. Returns None if cache unavailable; never parses esi.yml at scan time."""
+    """Load ESI lookup from cache.
+
+    Returns None if cache unavailable; never parses esi.yml at scan time.
+    """
     _, cache_path = get_esi_paths()
 
     if cache_path.exists():
@@ -158,7 +161,8 @@ def load_esi_lookup() -> dict[tuple[int, int, int], EsiLookupResult] | None:
             pass
 
     print(
-        "Warning: ESI device cache not found. Run 'ethercat-tool --fetch-esi' to download. Proceeding with raw IDs.",
+        "Warning: ESI device cache not found. Run 'ethercat-tool --fetch-esi' to "
+        "download. Proceeding with raw IDs.",
         file=sys.stderr,
     )
     return None
@@ -181,7 +185,7 @@ def lookup_device(
 def _parse_esi_and_save_cache(esi_path: Path, cache_path: Path) -> bool:
     """Parse esi.yml and save cache. Returns True on success."""
     try:
-        import yaml
+        import yaml  # type: ignore[import-untyped]
 
         print("  Loading YAML...", file=sys.stderr, flush=True)
         with open(esi_path, encoding="utf-8") as f:
@@ -212,11 +216,12 @@ def _parse_esi_and_save_cache(esi_path: Path, cache_path: Path) -> bool:
 
 def _format_bytes(n: int) -> str:
     """Format bytes as human-readable size (e.g. 44.2 MB)."""
+    size = float(n)
     for unit in ("B", "KB", "MB"):
-        if n < 1024:
-            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
-        n /= 1024
-    return f"{n:.1f} GB"
+        if size < 1024:
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+        size /= 1024
+    return f"{size:.1f} GB"
 
 
 def fetch_esi_data() -> bool:
@@ -246,7 +251,8 @@ def fetch_esi_data() -> bool:
                 if total_int:
                     pct = 100 * downloaded / total_int
                     print(
-                        f"\r  {_format_bytes(downloaded)} / {_format_bytes(total_int)} ({pct:.0f}%)",
+                        f"\r  {_format_bytes(downloaded)} / "
+                        f"{_format_bytes(total_int)} ({pct:.0f}%)",
                         end="",
                         file=sys.stderr,
                         flush=True,

@@ -1,13 +1,14 @@
-"""EtherCAT scan: open adapter, config_init, collect device info (CoE while open), return results."""
+"""EtherCAT scan: open adapter, config_init, collect device info while the master
+is open, and return results."""
 
 import traceback
 
 import pysoem
 
 from ethercat_tool.adapter_info import get_adapter_info
+from ethercat_tool.device_info import collect_device_info
 from ethercat_tool.diagnostics import read_diagnostics
 from ethercat_tool.models import DeviceInfo, LinkIssue, TopologySummary
-from ethercat_tool.device_info import collect_device_info
 
 
 def scan(
