@@ -146,6 +146,55 @@ Data is stored in `~/.local/share/ethercat-tool/` (or `%LOCALAPPDATA%\ethercat-t
   - Optional CoE diagnostic objects when the device exposes them
 - **Link / init issues:** init failures, “no devices found”, or other errors
 
+### Example report (excerpt)
+
+```markdown
+# EtherCAT Topology Report
+
+- **Adapter:** en7
+- **Adapter details:**
+  - MAC Address: A0:CE:C8:65:FE:B6
+  - Link State: active
+  - Link Speed: 100 Mb/s
+  - Hardware Port: AX88179A
+  - MTU: 1500
+- **Timestamp:** 2026-02-24 11:46:40 EST
+
+## Summary
+
+- **Devices found:** 6
+- **Init status:** OK
+
+## Topology
+
+`Master → [EK1100] → [EL1014] → [EL2004] → [EL6910] → [EL1904] → [EL2904]`
+
+### Device 0: EK1100
+
+| Field | Value |
+| --- | --- |
+| Manufacturer ID | 2 (0x00000002) — Beckhoff Automation GmbH & Co. KG |
+| Product Code | 72100946 (0x044C2C52) — EK1100 EtherCAT Coupler (2A E-Bus) |
+| Revision | 1179648 (0x00120000) |
+| Device Name | N/A |
+| Hardware Version | N/A |
+| Firmware | N/A |
+| Bootloader | N/A |
+| Serial | N/A |
+| State | PRE-OP (ACK) |
+| AL Status | OK (0x0000) |
+| Link loss | 5 |
+
+**Port diagnostics**
+
+| Port | Status | CRC | Fwd CRC |
+| --- | --- | --- | --- |
+| A | carrier / open | 0 | 0 |
+| B | carrier / open | 0 | 0 |
+| C | no carrier / closed | 0 | 255 |
+| D | no carrier / closed | 0 | 0 |
+```
+
 ## Troubleshooting init errors (e.g. on USB NIC / en0, en7)
 
 If you see an init error (e.g. "could not open interface en7" or "No devices found"):
