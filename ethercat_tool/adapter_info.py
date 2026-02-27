@@ -199,7 +199,15 @@ def _parse_ipconfig_adapters(ipconfig_out: str) -> list[dict[str, str]]:
     in_block = False
 
     for line in ipconfig_out.splitlines():
-        if "adapter" in line.lower() and ":" in line:
+        # Section header: "Ethernet adapter Name:" or "Wireless LAN adapter Name:" (avoid matching "Description ... : ... Adapter")
+        is_adapter_header = (
+            "adapter" in line.lower()
+            and ":" in line
+            and "Description" not in line
+            and "Physical Address" not in line
+            and "Media State" not in line
+        )
+        if is_adapter_header:
             if in_block and current.get("mac") and "loopback" not in current.get("desc", "").lower():
                 adapters.append(current)
             current = {"mac": "", "desc": "", "media_state": ""}
