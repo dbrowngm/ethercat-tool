@@ -8,12 +8,8 @@ from typing import NoReturn
 
 import pysoem
 
-from ethercat_tool.esi_data import (
-    fetch_esi_data,
-    has_esi_data,
-    load_esi_lookup,
-)
 from ethercat_tool.config_parser import parse_config, validate_scan
+from ethercat_tool.esi_data import fetch_esi_data, has_esi_data, load_esi_lookup
 from ethercat_tool.report import build_markdown
 from ethercat_tool.scanner import scan
 
@@ -77,7 +73,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--validate-config",
         metavar="PATH",
         dest="validate_config",
-        help="Validate scan against TwinCAT EtherCAT config XML (checks Device Name vs ProductRevision).",
+        help=(
+            "Validate scan against TwinCAT EtherCAT config XML "
+            "(checks Device Name vs ProductRevision)."
+        ),
     )
     return p.parse_args(argv)
 
@@ -141,7 +140,8 @@ def _ensure_esi_data(args: argparse.Namespace) -> bool:
         return True
     if args.fetch_esi:
         print(
-            "Downloading ESI device database (~44 MB, may take several minutes on slow networks)...",
+            "Downloading ESI device database (~44 MB, may take several minutes on "
+            "slow networks)...",
             file=sys.stderr,
         )
         if fetch_esi_data():
@@ -158,7 +158,8 @@ def _ensure_esi_data(args: argparse.Namespace) -> bool:
             ).strip().lower()
             if reply in ("y", "yes"):
                 print(
-                    "Downloading ESI device database (~44 MB, may take several minutes on slow networks)...",
+                    "Downloading ESI device database (~44 MB, may take several "
+                    "minutes on slow networks)...",
                     file=sys.stderr,
                 )
                 if fetch_esi_data():
@@ -259,7 +260,8 @@ def _run_scan(args: argparse.Namespace, user_argv: list[str]) -> int:
 def _run_fetch_esi() -> int:
     """Fetch ESI data and exit. Replaces any existing data."""
     print(
-        "Downloading ESI device database (~44 MB, may take several minutes on slow networks)...",
+        "Downloading ESI device database (~44 MB, may take several minutes on "
+        "slow networks)...",
         file=sys.stderr,
     )
     if fetch_esi_data():

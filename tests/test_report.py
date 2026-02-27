@@ -1,5 +1,7 @@
 """Unit tests for report builder."""
 
+from pathlib import Path
+
 from ethercat_tool.adapter_info import AdapterInfo
 from ethercat_tool.esi_data import EsiLookupResult
 from ethercat_tool.models import DeviceInfo, LinkIssue, TopologySummary
@@ -97,7 +99,7 @@ def test_build_markdown_multiple_devices_with_issues() -> None:
     assert "Device did not reach OP" in md
 
 
-def test_build_markdown_writes_file(tmp_path: str) -> None:
+def test_build_markdown_writes_file(tmp_path: Path) -> None:
     """build_markdown with output_path writes file and returns same string."""
     summary = TopologySummary(adapter_name="eth0", device_count=0, init_ok=False)
     out = tmp_path / "report.md"

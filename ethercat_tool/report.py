@@ -56,23 +56,25 @@ def _render_port_table(
     fwd_crc_by_port: dict[str, str] | None,
 ) -> list[str]:
     """Build per-port subtable lines. Returns empty if no port data."""
-    has_status = bool(port_status)
+    has_status = port_status is not None
     has_crc = bool(crc_by_port)
     has_fwd_crc = bool(fwd_crc_by_port)
     if not (has_status or has_crc or has_fwd_crc):
         return []
 
-    ports = set()
+    ports: set[str] = set()
     if port_status:
         ports.update(port_status)
     if crc_by_port:
         ports.update(crc_by_port)
     if fwd_crc_by_port:
         ports.update(fwd_crc_by_port)
-    ports = sorted(ports, key=lambda p: _PORT_LABELS.index(p) if p in _PORT_LABELS else 99)
+    sorted_ports = sorted(
+        ports, key=lambda p: _PORT_LABELS.index(p) if p in _PORT_LABELS else 99
+    )
 
     cols = ["Port"]
-    if has_status:
+    if has_status and port_status is not None:
         cols.append("Status")
     if has_crc:
         cols.append("CRC")
@@ -82,9 +84,9 @@ def _render_port_table(
     lines = ["", "**Port diagnostics**", ""]
     lines.append("| " + " | ".join(cols) + " |")
     lines.append("| " + " | ".join("---" for _ in cols) + " |")
-    for p in ports:
+    for p in sorted_ports:
         row = [p]
-        if has_status:
+        if has_status and port_status is not None:
             row.append(port_status.get(p, "—"))
         if has_crc:
             row.append(crc_by_port.get(p, "—") if crc_by_port else "—")

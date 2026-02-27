@@ -3,11 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from ethercat_tool.config_parser import (
-    ConfigValidationResult,
-    parse_config,
-    validate_scan,
-)
+from ethercat_tool.config_parser import parse_config, validate_scan
 from ethercat_tool.models import DeviceInfo
 
 

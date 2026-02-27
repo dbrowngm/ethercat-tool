@@ -4,8 +4,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from ethercat_tool.esi_data import (
     EsiLookupResult,
     _build_lookup_from_yaml,
