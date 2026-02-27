@@ -58,6 +58,12 @@ pip install -e .
 
 `pip` installs the Python packages. The `-e` flag installs the tool in “editable” mode so changes in the source take effect without reinstalling.
 
+For development (tests, linting, type checking), install the optional `dev` dependencies:
+
+```bash
+pip install -e .[dev]
+```
+
 ### Platform requirements
 
 - **Windows:** [Npcap](https://nmap.org/npcap/) or WinPcap (for raw Ethernet). Use `--list-adapters` to see adapters. You can use the **index** (0, 1, 2…) instead of the full device ID: `--adapter 0`.
@@ -215,3 +221,13 @@ The exact error is always in the report under **Link / init issues** and is also
 - **Link/CRC diagnostics:** Per-port CRC counters (RXERR, Fwd CRC) and link-loss are read from ESC registers via FPRD—available on all standard EtherCAT slaves, same as TwinCAT. Some older or custom ESC implementations may not support this; the tool falls back gracefully. Optional CoE diagnostic objects are also read when present (best-effort).
 - **Port status:** Port A/B/C/D (carrier/closed vs no carrier/open) is read via the ESC DL Status register (0x0110) using FPRD—same mechanism as the per-port CRC counters. No PySOEM changes required. Fallbacks: PySOEM `activeports` (if exposed) or CoE 0xF030 (device-specific).
 - **Real-time:** This tool is for troubleshooting only. It does not provide real-time cycle or distributed clock sync.
+
+## Contributing
+
+Contributions are welcome! See `CONTRIBUTING.md` for how to:
+
+- Set up a development environment
+- Run tests, linting, and type checks
+- Open issues and pull requests
+
+By participating in this project, you agree to follow the expectations in `CODE_OF_CONDUCT.md`.
